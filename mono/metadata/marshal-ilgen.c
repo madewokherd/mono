@@ -6211,7 +6211,7 @@ static void
 emit_managed_wrapper_ilgen (MonoMethodBuilder *mb, MonoMethodSignature *invoke_sig, MonoMarshalSpec **mspecs, EmitMarshalContext* m, MonoMethod *method, MonoGCHandle target_handle)
 {
 	MonoMethodSignature *sig, *csig;
-	int i, *tmp_locals, orig_domain, attach_cookie;
+	int i, *tmp_locals, orig_domain, attach_cookie, ccw_attach_cookie;
 	gboolean closed = FALSE;
 
 	sig = m->sig;
@@ -6247,6 +6247,9 @@ emit_managed_wrapper_ilgen (MonoMethodBuilder *mb, MonoMethodSignature *invoke_s
 	orig_domain = mono_mb_add_local (mb, int_type);
 	attach_cookie = mono_mb_add_local (mb, int_type);
 
+	if (method->wrapper_type == MONO_WRAPPER_COMINTEROP)
+		ccw_attach_cookie = mono_mb_add_local (mb, int_type);
+
 	/*
 	 * // does (STARTING|RUNNING|BLOCKING) -> RUNNING + set/switch domain
 	 * intptr_t attach_cookie;
@@ -6278,6 +6281,13 @@ emit_managed_wrapper_ilgen (MonoMethodBuilder *mb, MonoMethodSignature *invoke_s
 
 	/* <interrupt check> */
 	emit_thread_interrupt_checkpoint (mb);
+
+	if (method->wrapper_type == MONO_WRAPPER_COMINTEROP)
+	{
+		/* Attach to the object's domain before doing argument conversions */
+		mono_mb_emit_ldarg (mb, 0);
+		mono_mb_emit_icall (mb, mono_cominterop_set_ccw_domain);
+	}
 
 	/* we first do all conversions */
 	tmp_locals = g_newa (int, sig->param_count);

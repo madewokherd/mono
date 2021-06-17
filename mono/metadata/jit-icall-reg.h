@@ -123,8 +123,6 @@ MONO_JIT_ICALL (cominterop_get_function_pointer) \
 MONO_JIT_ICALL (cominterop_get_interface) \
 MONO_JIT_ICALL (cominterop_get_method_interface) \
 MONO_JIT_ICALL (cominterop_object_is_rcw) \
-MONO_JIT_ICALL (cominterop_restore_domain) \
-MONO_JIT_ICALL (cominterop_set_ccw_object_domain) \
 MONO_JIT_ICALL (cominterop_type_from_handle) \
 MONO_JIT_ICALL (g_free) \
 MONO_JIT_ICALL (interp_to_native_trampoline)	\
@@ -166,6 +164,7 @@ MONO_JIT_ICALL (mono_chkstk_win64) \
 MONO_JIT_ICALL (mono_ckfinite) \
 MONO_JIT_ICALL (mono_class_interface_match) \
 MONO_JIT_ICALL (mono_class_static_field_address) \
+MONO_JIT_ICALL (mono_cominterop_set_ccw_domain) \
 MONO_JIT_ICALL (mono_compile_method_icall) \
 MONO_JIT_ICALL (mono_context_get_icall) \
 MONO_JIT_ICALL (mono_context_set_icall) \
