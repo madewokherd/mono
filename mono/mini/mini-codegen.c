@@ -1457,7 +1457,7 @@ mono_local_regalloc (MonoCompile *cfg, MonoBasicBlock *bb)
 						assign_reg (cfg, rs, sreg, dest_sreg, 0);
 					} else if (val < -1) {
 						/* FIXME: */
-						g_assert_not_reached ();
+						/*g_assert_not_reached ();*/
 					} else {
 						/* Argument already in hard reg, need to copy */
 						MonoInst *copy = create_copy_ins (cfg, bb, tmp, dest_sreg, val, NULL, ip, 0);
