@@ -27,7 +27,7 @@ jobs:
       run: |
         git add mono
         git submodule init mono
-        git submodule update --depth 0 --init --recursive
+        git submodule update --depth 1 --init --recursive
 
     - name: Remove packages require EULA
       run: sudo apt remove msodbcsql17 linux-azure linux-cloud-tools-azure linux-headers-azure linux-image-azure linux-tools-azure -y 1>&2
