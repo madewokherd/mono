@@ -15,7 +15,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
       with:
-          repository: git://github.com/madewokherd/wine-mono.git
+          repository: madewokherd/wine-mono
           ref: develop
 
     - uses: actions/checkout@v2
