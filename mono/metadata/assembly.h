@@ -105,6 +105,18 @@ void          mono_install_assembly_preload_hook (MonoAssemblyPreLoadFunc func, 
 MONO_API MONO_RT_EXTERNAL_ONLY
 void          mono_install_assembly_refonly_preload_hook (MonoAssemblyPreLoadFunc func, void* user_data);
 
+/* Wine Mono extension: allows for interrupting later preload hooks */
+typedef MonoAssembly * (*WineMonoAssemblyPreLoadFunc) (MonoAssemblyName *aname,
+						   char **assemblies_path,
+						   int *halt_search,
+						   void* user_data);
+
+MONO_API MONO_RT_EXTERNAL_ONLY
+void          wine_mono_install_assembly_preload_hook (WineMonoAssemblyPreLoadFunc func, void* user_data);
+
+MONO_API MONO_RT_EXTERNAL_ONLY
+void          mono_install_assembly_preload_hook (MonoAssemblyPreLoadFunc func, void* user_data);
+
 MONO_API MONO_RT_EXTERNAL_ONLY void
 mono_assembly_invoke_load_hook (MonoAssembly *ass);
 

@@ -2099,6 +2099,7 @@ struct AssemblyPreLoadHook {
 		MonoAssemblyPreLoadFunc v1; // legacy internal use
 		MonoAssemblyPreLoadFuncV2 v2; // current internal use
 		MonoAssemblyPreLoadFuncV3 v3; // netcore external use
+		WineMonoAssemblyPreLoadFunc wine;
 	} func;
 	gpointer user_data;
 	gint32 version;
@@ -2116,6 +2117,13 @@ invoke_assembly_preload_hook (MonoAssemblyLoadContext *alc, MonoAssemblyName *an
 	for (hook = assembly_preload_hook; hook; hook = hook->next) {
 		if (hook->version == 1)
 			assembly = hook->func.v1 (aname, apath, hook->user_data);
+		else if (hook->version == -1)
+		{
+			int halt_search=0;
+			assembly = hook->func.wine (aname, apath, &halt_search, hook->user_data);
+			if (assembly == NULL && halt_search)
+				break;
+		}
 		else {
 			ERROR_DECL (error);
 			g_assert (hook->version == 2 || hook->version == 3);
@@ -2170,6 +2178,21 @@ mono_install_assembly_preload_hook (MonoAssemblyPreLoadFunc func, gpointer user_
 	hook = g_new0 (AssemblyPreLoadHook, 1);
 	hook->version = 1;
 	hook->func.v1 = func;
+	hook->user_data = user_data;
+	hook->next = assembly_preload_hook;
+	assembly_preload_hook = hook;
+}
+
+void
+wine_mono_install_assembly_preload_hook (WineMonoAssemblyPreLoadFunc func, gpointer user_data)
+{
+	AssemblyPreLoadHook *hook;
+	
+	g_return_if_fail (func != NULL);
+
+	hook = g_new0 (AssemblyPreLoadHook, 1);
+	hook->version = -1;
+	hook->func.wine = func;
 	hook->user_data = user_data;
 	hook->next = assembly_preload_hook;
 	assembly_preload_hook = hook;
