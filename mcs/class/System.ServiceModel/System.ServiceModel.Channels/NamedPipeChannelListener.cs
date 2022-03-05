@@ -67,7 +67,8 @@ namespace System.ServiceModel.Channels
 
 		protected override TChannel OnAcceptChannel (TimeSpan timeout)
 		{
-Console.WriteLine ("NamedPipeChannelListener.OnAcceptChannel");
+			if (timeout == TimeSpan.MaxValue)
+				timeout = TimeSpan.FromMilliseconds(int.MaxValue);
 
 			if (active_server != null) {
 				try {
@@ -76,12 +77,10 @@ Console.WriteLine ("NamedPipeChannelListener.OnAcceptChannel");
 					return null;
 				}
 			}
-Console.WriteLine ("NamedPipeChannelListener.OnAcceptChannel.2");
 
 			var server = new NamedPipeServerStream (Uri.LocalPath.Substring (1).Replace ('/', '\\'), PipeDirection.InOut);
 			active_server = server;
 
-Console.WriteLine ("NamedPipeChannelListener.OnAcceptChannel.3");
 			Action a = delegate {
 				server.WaitForConnection ();
 			};
