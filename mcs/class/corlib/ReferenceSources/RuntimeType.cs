@@ -197,7 +197,7 @@ namespace System
 			throw new ArgumentException(String.Format(CultureInfo.CurrentUICulture, Environment.GetResourceString("Arg_ObjObjEx"), value.GetType(), this));
 		}
 
-		object TryConvertToType (object value, ref bool failed)
+		unsafe object TryConvertToType (object value, ref bool failed)
 		{
 			if (IsInstanceOfType (value)) {
 				return value;
@@ -228,6 +228,8 @@ namespace System
 				var vtype = value.GetType ();
 				if (vtype == typeof (IntPtr) || vtype == typeof (UIntPtr))
 					return value;
+				if (vtype == typeof (Pointer))
+					return new IntPtr (Pointer.Unbox (value));
 			}
 
 			failed = true;
