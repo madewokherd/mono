@@ -3304,6 +3304,9 @@ mono_emit_marshal (EmitMarshalContext *m, int argnum, MonoType *t,
 		if (ptr_type_is_copy_constructed (t))
 			return get_marshal_cb ()->emit_marshal_copy_ctor (m, argnum, t, spec, conv_arg, conv_arg_type, action);
 
+		if (action == MARSHAL_ACTION_MANAGED_CONV_IN)
+			return 0;
+
 		return get_marshal_cb ()->emit_marshal_ptr (m, argnum, t, spec, conv_arg, conv_arg_type, action);
 	case MONO_TYPE_CHAR:
 		return get_marshal_cb ()->emit_marshal_char (m, argnum, t, spec, conv_arg, conv_arg_type, action);

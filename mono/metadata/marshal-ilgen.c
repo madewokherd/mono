@@ -6294,8 +6294,20 @@ emit_marshal_copy_ctor_ilgen (EmitMarshalContext *m, int argnum, MonoType *t,
 		break;
 	}
 	case MARSHAL_ACTION_CONV_RESULT: {
-		char *msg = g_strdup ("IsCopyContructed marshaling not supported for return type.");
+		char *msg = g_strdup ("IsCopyConstructed marshaling not supported for return type.");
 		mono_mb_emit_exception_marshal_directive (mb, msg);
+		break;
+	}
+	case MARSHAL_ACTION_MANAGED_CONV_IN: {
+#ifdef COPY_CTOR_DEREFERENCE
+		conv_arg = mono_mb_add_local (mb, t);
+		*conv_arg_type = target_type;
+		mono_mb_emit_ldarg_addr (mb, argnum);
+		mono_mb_emit_stloc (mb, conv_arg);
+#else
+		return 0;
+#endif
+
 		break;
 	}
 	default:
@@ -6404,6 +6416,7 @@ emit_managed_wrapper_ilgen (MonoMethodBuilder *mb, MonoMethodSignature *invoke_s
 		case MONO_TYPE_SZARRAY:
 		case MONO_TYPE_STRING:
 		case MONO_TYPE_BOOLEAN:
+		case MONO_TYPE_PTR:
 			tmp_locals [i] = mono_emit_marshal (m, i, sig->params [i], mspecs [i + 1], 0, &csig->params [i], MARSHAL_ACTION_MANAGED_CONV_IN);
 			break;
 		default:
