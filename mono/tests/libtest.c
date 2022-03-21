@@ -4239,6 +4239,77 @@ mono_test_marshal_array_ccw_itest (int count, MonoComObject ** ppUnk)
 }
 
 LIBTEST_API int STDCALL
+mono_test_marshal_array_out_ccw_itest (int count, MonoComObject ** ppUnk, int *pCount, MonoComObject ** ppOutUnk)
+{
+	int hr = 0;
+
+	if (!ppUnk)
+		return 1;
+
+	if (count < 1)
+		return 2;
+
+	if (!ppUnk[0])
+		return 3;
+
+	hr = ppUnk[0]->vtbl->SByteIn (ppUnk[0], -100);
+	if (hr != 0)
+		return 4;
+
+	if (!pCount)
+		return 6;
+
+	if (*pCount != 1)
+		return 7;
+
+	if (!ppOutUnk)
+		return 8;
+
+	ppUnk[0]->vtbl->AddRef (ppUnk[0]);
+	ppOutUnk[0] = ppUnk[0];
+	*pCount = 0;
+
+	return 0;
+}
+
+LIBTEST_API int STDCALL
+mono_test_marshal_array_out_byref_ccw_itest (int count, MonoComObject ** ppUnk, int *pCount, MonoComObject *** ppOutUnk)
+{
+	int hr = 0;
+
+	if (!ppUnk)
+		return 1;
+
+	if (count < 1)
+		return 2;
+
+	if (!ppUnk[0])
+		return 3;
+
+	hr = ppUnk[0]->vtbl->SByteIn (ppUnk[0], -100);
+	if (hr != 0)
+		return 4;
+
+	if (!pCount)
+		return 6;
+
+	if (*pCount != 1)
+		return 7;
+
+	if (!ppOutUnk)
+		return 8;
+
+	if (!*ppOutUnk)
+		*ppOutUnk = calloc(1, sizeof(MonoComObject *));
+
+	ppUnk[0]->vtbl->AddRef (ppUnk[0]);
+	(*ppOutUnk)[0] = ppUnk[0];
+	*pCount = 0;
+
+	return 0;
+}
+
+LIBTEST_API int STDCALL
 mono_test_marshal_point_class_ccw_itest (MonoComObject *pUnk)
 {
 	point pt, *ppt;

@@ -284,6 +284,14 @@ public class Tests
 	public static extern int mono_test_marshal_array_ccw_itest (int count, [MarshalAs (UnmanagedType.LPArray, SizeParamIndex=0)] ITest[] ppUnk);
 
 	[DllImport ("libtest")]
+	public static extern int mono_test_marshal_array_out_ccw_itest (int count, [MarshalAs (UnmanagedType.LPArray, SizeParamIndex=0)] ITest[] ppUnk, ref int pCount,
+									[Out, MarshalAs (UnmanagedType.LPArray, SizeConst=1, SizeParamIndex=2)] ITest[] ppOutUnk);
+
+	[DllImport ("libtest")]
+	public static extern int mono_test_marshal_array_out_byref_ccw_itest (int count, [MarshalAs (UnmanagedType.LPArray, SizeParamIndex=0)] ITest[] ppUnk, ref int pCount,
+									      [In, Out, MarshalAs (UnmanagedType.LPArray, SizeConst=1, SizeParamIndex=2)] ref ITest[] ppOutUnk);
+
+	[DllImport ("libtest")]
 	public static extern int mono_test_marshal_point_class_ccw_itest ([MarshalAs (UnmanagedType.Interface)]ITest itest);
 
 	[DllImport ("libtest")]
@@ -728,6 +736,36 @@ public class Tests
 
 			if (mono_test_marshal_ccw_iface_obj (test, test, test, Marshal.GetIUnknownForObject (test)) != 0)
 				return 213;
+
+			var count = 1;
+			var outTests = new ITest[4];
+			outTests[0] = null;
+			outTests[1] = tests[0];
+			if (mono_test_marshal_array_out_ccw_itest (1, tests, ref count, outTests) != 0)
+				return 214;
+
+			if (count != 0)
+				return 215;
+
+			if (outTests.Length != 4)
+				return 216;
+
+			count = 1;
+			outTests[0] = tests[0];
+			outTests[1] = tests[0];
+			if (mono_test_marshal_array_out_byref_ccw_itest (1, tests, ref count, ref outTests) != 0)
+				return 219;
+
+			if (count != 0)
+				return 220;
+
+			count = 1;
+			outTests = null;
+			if (mono_test_marshal_array_out_byref_ccw_itest (1, tests, ref count, ref outTests) != 0)
+				return 224;
+
+			if (outTests == null)
+				return 225;
 
 			#endregion // COM Callable Wrapper Tests
 
