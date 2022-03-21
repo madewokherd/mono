@@ -247,7 +247,7 @@ mono_marshal_init (void)
 		register_icall (mono_string_builder_to_utf16, mono_icall_sig_ptr_object, FALSE);
 		register_icall (mono_array_to_savearray, mono_icall_sig_ptr_object, FALSE);
 		register_icall (mono_array_to_lparray, mono_icall_sig_ptr_object, FALSE);
-		register_icall (mono_free_lparray, mono_icall_sig_void_object_ptr, FALSE);
+		register_icall (mono_array_from_lparray, mono_icall_sig_void_object_ptr, FALSE);
 		register_icall (mono_byvalarray_to_byte_array, mono_icall_sig_void_object_ptr_int32, FALSE);
 		register_icall (mono_array_to_byte_byvalarray, mono_icall_sig_void_ptr_object_int32, FALSE);
 		register_icall (mono_delegate_to_ftnptr, mono_icall_sig_ptr_object, FALSE);
@@ -679,6 +679,8 @@ mono_array_to_lparray_impl (MonoArrayHandle array_handle, MonoError *error)
 		nativeVarArray = g_new (struct native_variant, nativeArraySize);
 		method = mono_get_Marshal_GetNativeVariantForObject ();
 
+		// FIXME: Fill with NULL if marshaling attribute is not In
+
 		for (i = 0; i < array->max_length; i++) {
 			gpointer variant_addr = nativeVarArray + i;
 			gpointer args [2] = { ((MonoObject **)array->vector)[i], &variant_addr };
@@ -693,6 +695,9 @@ mono_array_to_lparray_impl (MonoArrayHandle array_handle, MonoError *error)
 	case MONO_TYPE_CLASS:
 		nativeArraySize = array->max_length;
 		nativeArray = g_new (gpointer, nativeArraySize);
+
+		// FIXME: Fill with NULL if marshaling attribute is not In
+
 		for (i = 0; i < nativeArraySize; ++i) {
 			nativeArray [i] = mono_cominterop_get_com_interface (((MonoObject **)array->vector)[i], klass_element_class, error);
 			if (!is_ok (error)) {
@@ -731,18 +736,133 @@ mono_array_to_lparray_impl (MonoArrayHandle array_handle, MonoError *error)
 	return array->vector;
 }
 
+G_GNUC_UNUSED
+static MonoMethod*
+mono_get_Marshal_GetObjectForIUnknown (void)
+{
+	ERROR_DECL (error);
+
+	MONO_STATIC_POINTER_INIT (MonoMethod, get_object_for_iunknown)
+		get_object_for_iunknown = mono_class_get_method_from_name_checked (mono_defaults.marshal_class, "GetObjectForIUnknown", 1, 0, error);
+		mono_error_assert_ok (error);
+	MONO_STATIC_POINTER_INIT_END (MonoMethod, get_object_for_iunknown)
+
+	g_assert (get_object_for_iunknown);
+	return get_object_for_iunknown;
+}
+
+G_GNUC_UNUSED
+static MonoMethod*
+mono_get_Marshal_GetObjectForNativeVariant (void)
+{
+	ERROR_DECL (error);
+
+	MONO_STATIC_POINTER_INIT (MonoMethod, get_object_for_native_variant)
+		get_object_for_native_variant = mono_class_get_method_from_name_checked (mono_defaults.marshal_class, "GetObjectForNativeVariant", 1, 0, error);
+		mono_error_assert_ok (error);
+	MONO_STATIC_POINTER_INIT_END (MonoMethod, get_object_for_native_variant)
+
+	g_assert (get_object_for_native_variant);
+	return get_object_for_native_variant;
+}
+
 void
-mono_free_lparray_impl (MonoArrayHandle array, gpointer* nativeArray, MonoError *error)
+mono_array_from_lparray_impl (MonoArrayHandle array_handle, gpointer* nativeArray, MonoError *error)
 {
 #ifndef DISABLE_COM
-	if (!nativeArray || MONO_HANDLE_IS_NULL (array))
+	if (!nativeArray || MONO_HANDLE_IS_NULL (array_handle))
 		return;
 
-	MonoClass * const klass = mono_handle_class (array);
+	MonoArray *array = MONO_HANDLE_RAW (array_handle);
+	struct native_variant *nativeVarArray = (void *)nativeArray;
+	MonoClass * const klass = mono_handle_class (array_handle);
+	MonoClass * const klass_element_class = m_class_get_element_class (klass);
+	MonoMethod *method;
+	MonoObject *object;
+	int i = 0;
 
-	if (m_class_get_byval_arg (m_class_get_element_class (klass))->type == MONO_TYPE_CLASS ||
-		m_class_get_byval_arg (m_class_get_element_class (klass))->type == MONO_TYPE_OBJECT)
+	switch (m_class_get_byval_arg (klass_element_class)->type) {
+	case MONO_TYPE_VOID:
+		g_assert_not_reached ();
+		break;
+	case MONO_TYPE_OBJECT:
+		method = mono_get_Marshal_GetObjectForNativeVariant ();
+		for (i = 0; i < array->max_length; i++) {
+			if (!nativeArray[i]) {
+				((MonoObject **)array->vector)[i] = NULL;
+				continue;
+			}
+
+			gpointer variant_addr = nativeVarArray + i;
+			gpointer args [1] = { &variant_addr };
+
+			object = mono_runtime_invoke_checked (method, NULL, args, error);
+			if (!is_ok (error)) {
+				// FIXME? Returns uninitialized.
+				break;
+			}
+
+			object = mono_object_isinst_checked (object, klass_element_class, error);
+			if (!is_ok (error)) {
+				// FIXME? Returns uninitialized.
+				break;
+			}
+			((MonoObject **)array->vector)[i] = object;
+		}
 		g_free (nativeArray);
+		break;
+	case MONO_TYPE_CLASS:
+		method = mono_get_Marshal_GetObjectForIUnknown ();
+		for (i = 0; i < array->max_length; i++) {
+			if (!nativeArray[i]) {
+				((MonoObject **)array->vector)[i] = NULL;
+				continue;
+			}
+
+			gpointer args [1] = { nativeArray + i };
+
+			object = mono_runtime_invoke_checked (method, NULL, args, error);
+			if (!is_ok (error)) {
+				// FIXME? Returns uninitialized.
+				break;
+			}
+
+			object = mono_object_isinst_checked (object, klass_element_class, error);
+			if (!is_ok (error)) {
+				// FIXME? Returns uninitialized.
+				break;
+			}
+			((MonoObject **)array->vector)[i] = object;
+		}
+		g_free (nativeArray);
+		break;
+	case MONO_TYPE_U1:
+	case MONO_TYPE_BOOLEAN:
+	case MONO_TYPE_I1:
+	case MONO_TYPE_U2:
+	case MONO_TYPE_CHAR:
+	case MONO_TYPE_I2:
+	case MONO_TYPE_I:
+	case MONO_TYPE_U:
+	case MONO_TYPE_I4:
+	case MONO_TYPE_U4:
+	case MONO_TYPE_U8:
+	case MONO_TYPE_I8:
+	case MONO_TYPE_R4:
+	case MONO_TYPE_R8:
+	case MONO_TYPE_VALUETYPE:
+	case MONO_TYPE_PTR:
+		if (array->vector != nativeArray)
+			memcpy (array->vector, nativeArray, array->max_length * mono_class_native_size (klass_element_class, NULL));
+		break;
+	case MONO_TYPE_GENERICINST:
+	case MONO_TYPE_ARRAY:
+	case MONO_TYPE_SZARRAY:
+	case MONO_TYPE_STRING:
+	default:
+		g_warning ("type 0x%x not handled", m_class_get_byval_arg (klass_element_class)->type);
+		g_assert_not_reached ();
+	}
 #endif
 }
 

@@ -750,6 +750,15 @@ public class Tests
 			if (outTests.Length != 4)
 				return 216;
 
+			if (outTests[0] != tests[0])
+				return 217;
+
+/*
+			// FIXME: Out LPArray should be cleared when marshaled
+			if (outTests[1] != null)
+				return 218;
+*/
+
 			count = 1;
 			outTests[0] = tests[0];
 			outTests[1] = tests[0];
@@ -762,6 +771,9 @@ public class Tests
 			if (outTests.Length != 1)
 				return 221;
 
+			if (outTests[0] != tests[0])
+				return 222;
+
 			count = 1;
 			outTests = null;
 			if (mono_test_marshal_array_out_byref_ccw_itest (1, tests, ref count, ref outTests) != 0)
@@ -772,6 +784,9 @@ public class Tests
 
 			if (outTests.Length != 1)
 				return 226;
+
+			if (outTests[0] != tests[0])
+				return 227;
 
 			#endregion // COM Callable Wrapper Tests
 

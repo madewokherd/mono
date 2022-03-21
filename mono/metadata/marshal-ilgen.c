@@ -777,8 +777,8 @@ conv_to_icall (MonoMarshalConv conv, int *ind_store_type)
 
 	case MONO_MARSHAL_CONV_ARRAY_LPARRAY:
 		return MONO_JIT_ICALL_mono_array_to_lparray;
-	case MONO_MARSHAL_FREE_LPARRAY:
-		return MONO_JIT_ICALL_mono_free_lparray;
+	case MONO_MARSHAL_CONV_LPARRAY_ARRAY:
+		return MONO_JIT_ICALL_mono_array_from_lparray;
 
 	default:
 		g_assert_not_reached ();
@@ -2599,12 +2599,6 @@ emit_marshal_array_ilgen (EmitMarshalContext *m, int argnum, MonoType *t,
 		break;
 
 	case MARSHAL_ACTION_CONV_OUT: {
-#ifndef DISABLE_NONBLITTABLE
-		gboolean need_convert, need_free;
-		/* Unicode character arrays are implicitly marshalled as [Out] under MS.NET */
-		need_convert = ((eklass == mono_defaults.char_class) && (encoding == MONO_NATIVE_LPWSTR)) || (eklass == mono_class_try_get_stringbuilder_class ()) || (t->attrs & PARAM_ATTRIBUTE_OUT);
-		need_free = mono_marshal_need_free (m_class_get_byval_arg (eklass), m->piinfo, spec);
-
 		if (t->byref) {
 			mono_mb_emit_ldarg (mb, argnum);
 
@@ -2616,8 +2610,25 @@ emit_marshal_array_ilgen (EmitMarshalContext *m, int argnum, MonoType *t,
 			mono_mb_emit_byte (mb, CEE_STIND_REF);
 		}
 
+		if (m_class_is_blittable (eklass)) {
+			mono_mb_emit_ldarg (mb, argnum);
+			if (t->byref)
+				mono_mb_emit_byte (mb, CEE_LDIND_REF);
+			mono_mb_emit_ldloc (mb, conv_arg);
+			mono_mb_emit_icall_id (mb, conv_to_icall (MONO_MARSHAL_CONV_LPARRAY_ARRAY, NULL));
+			break;
+		}
+
+#ifdef DISABLE_NONBLITTABLE
+		char *msg = g_strdup ("Non-blittable marshalling conversion is disabled");
+		mono_mb_emit_exception_marshal_directive (mb, msg);
+#else
+		gboolean need_convert, need_free;
+		/* Unicode character arrays are implicitly marshalled as [Out] under MS.NET */
+		need_convert = ((eklass == mono_defaults.char_class) && (encoding == MONO_NATIVE_LPWSTR)) || (eklass == mono_class_try_get_stringbuilder_class ()) || (t->attrs & PARAM_ATTRIBUTE_OUT);
+		need_free = mono_marshal_need_free (m_class_get_byval_arg (eklass), m->piinfo, spec);
+
 		if (need_convert || need_free) {
-			/* FIXME: Optimize blittable case */
 			guint32 label1, label2, label3;
 			int index_var, src_ptr, loc, esize;
 
@@ -2724,17 +2735,6 @@ emit_marshal_array_ilgen (EmitMarshalContext *m, int argnum, MonoType *t,
 			mono_mb_patch_branch (mb, label3);
 		}
 #endif
-		
-		if (m_class_is_blittable (eklass)) {
-			/* free memory allocated (if any) by MONO_MARSHAL_CONV_ARRAY_LPARRAY */
-
-			mono_mb_emit_ldarg (mb, argnum);
-			if (t->byref)
-				mono_mb_emit_byte (mb, CEE_LDIND_REF);
-			mono_mb_emit_ldloc (mb, conv_arg);
-			mono_mb_emit_icall_id (mb, conv_to_icall (MONO_MARSHAL_FREE_LPARRAY, NULL));
-		}
-
 		break;
 	}
 

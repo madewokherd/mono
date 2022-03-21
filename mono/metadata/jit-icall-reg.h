@@ -156,6 +156,7 @@ MONO_JIT_ICALL (mono_array_new_2) \
 MONO_JIT_ICALL (mono_array_new_3) \
 MONO_JIT_ICALL (mono_array_new_4) \
 MONO_JIT_ICALL (mono_array_new_n_icall) \
+MONO_JIT_ICALL (mono_array_from_lparray) \
 MONO_JIT_ICALL (mono_array_to_byte_byvalarray) \
 MONO_JIT_ICALL (mono_array_to_lparray) \
 MONO_JIT_ICALL (mono_array_to_savearray) \
@@ -186,7 +187,6 @@ MONO_JIT_ICALL (mono_fill_method_rgctx) \
 MONO_JIT_ICALL (mono_fload_r4) \
 MONO_JIT_ICALL (mono_fload_r4_arg) \
 MONO_JIT_ICALL (mono_free_bstr) \
-MONO_JIT_ICALL (mono_free_lparray) \
 MONO_JIT_ICALL (mono_fstore_r4) \
 MONO_JIT_ICALL (mono_ftnptr_to_delegate) \
 MONO_JIT_ICALL (mono_gc_alloc_obj) \
