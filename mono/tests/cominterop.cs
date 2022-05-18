@@ -759,6 +759,9 @@ public class Tests
 			if (count != 0)
 				return 220;
 
+			if (outTests.Length != 1)
+				return 221;
+
 			count = 1;
 			outTests = null;
 			if (mono_test_marshal_array_out_byref_ccw_itest (1, tests, ref count, ref outTests) != 0)
@@ -766,6 +769,9 @@ public class Tests
 
 			if (outTests == null)
 				return 225;
+
+			if (outTests.Length != 1)
+				return 226;
 
 			#endregion // COM Callable Wrapper Tests
 

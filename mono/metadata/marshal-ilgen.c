@@ -2406,6 +2406,50 @@ load_value_class (MonoMethodBuilder *mb, int vklass)
 	mono_mb_emit_stloc (mb, vklass);
 }
 
+static void
+emit_lparray_size (MonoMethodBuilder *mb, EmitMarshalContext *m, MonoType *t, MonoMarshalSpec *spec)
+{
+	int param_num = -1;
+	int num_elem = 0;
+
+	if ((t->attrs & PARAM_ATTRIBUTE_OUT) && spec && spec->native == MONO_NATIVE_LPARRAY)
+	{
+		param_num = spec->data.array_data.param_num;
+		num_elem = spec->data.array_data.num_elem;
+		if (spec->data.array_data.elem_mult == 0)
+			/* param_num is not specified */
+			param_num = -1;
+
+		if (param_num == -1 && num_elem <= 0) {
+			//g_assert_not_reached ();
+			num_elem = 0;
+		}
+	}
+
+	if (param_num == -1) {
+		mono_mb_emit_icon (mb, num_elem);
+	} else {
+		mono_mb_emit_ldarg (mb, param_num);
+
+		MonoType *param_type = m->sig->params [param_num];
+		if (param_type->byref) {
+			if (param_type->type != MONO_TYPE_I4) {
+				char *msg = g_strdup ("Not implemented.");
+				mono_mb_emit_exception_marshal_directive (mb, msg);
+				return;
+			}
+			mono_mb_emit_byte (mb, CEE_LDIND_I4);
+		}
+
+		if (num_elem > 0) {
+			mono_mb_emit_icon (mb, num_elem);
+			mono_mb_emit_byte (mb, CEE_ADD);
+		}
+
+		mono_mb_emit_byte (mb, CEE_CONV_OVF_I);
+	}
+}
+
 static int
 emit_marshal_array_ilgen (EmitMarshalContext *m, int argnum, MonoType *t,
 					MonoMarshalSpec *spec, 
@@ -2561,31 +2605,15 @@ emit_marshal_array_ilgen (EmitMarshalContext *m, int argnum, MonoType *t,
 		need_convert = ((eklass == mono_defaults.char_class) && (encoding == MONO_NATIVE_LPWSTR)) || (eklass == mono_class_try_get_stringbuilder_class ()) || (t->attrs & PARAM_ATTRIBUTE_OUT);
 		need_free = mono_marshal_need_free (m_class_get_byval_arg (eklass), m->piinfo, spec);
 
-		if ((t->attrs & PARAM_ATTRIBUTE_OUT) && spec && spec->native == MONO_NATIVE_LPARRAY && spec->data.array_data.param_num != -1) {
-			int param_num = spec->data.array_data.param_num;
-			MonoType *param_type;
+		if (t->byref) {
+			mono_mb_emit_ldarg (mb, argnum);
 
-			param_type = m->sig->params [param_num];
+			/* Create the managed array */
+			emit_lparray_size (mb, m, t, spec);
+			mono_mb_emit_op (mb, CEE_NEWARR, eklass);
 
-			if (param_type->byref && param_type->type != MONO_TYPE_I4) {
-				char *msg = g_strdup ("Not implemented.");
-				mono_mb_emit_exception_marshal_directive (mb, msg);
-				break;
-			}
-
-			if (t->byref ) {
-				mono_mb_emit_ldarg (mb, argnum);
-
-				/* Create the managed array */
-				mono_mb_emit_ldarg (mb, param_num);
-				if (m->sig->params [param_num]->byref)
-					// FIXME: Support other types
-					mono_mb_emit_byte (mb, CEE_LDIND_I4);
-				mono_mb_emit_byte (mb, CEE_CONV_OVF_I);
-				mono_mb_emit_op (mb, CEE_NEWARR, eklass);
-				/* Store into argument */
-				mono_mb_emit_byte (mb, CEE_STIND_REF);
-			}
+			/* Store into argument */
+			mono_mb_emit_byte (mb, CEE_STIND_REF);
 		}
 
 		if (need_convert || need_free) {
