@@ -6304,12 +6304,19 @@ emit_marshal_copy_ctor_ilgen (EmitMarshalContext *m, int argnum, MonoType *t,
 		break;
 	}
 	case MARSHAL_ACTION_CONV_OUT: {
-		MonoMethod *destroy_method = get_method_nofail (target_class, "<MarshalDestroy>", 1, METHOD_ATTRIBUTE_SPECIAL_NAME);
+		MonoMethod *destroy_method;
+		ERROR_DECL (error);
 
-		// .NET Framework destroys arg, not conv_arg. This makes no sense, but we duplicate the bug here.
-		// In a sensible universe, this would be: mono_mb_emit_ldloc_addr (mb, conv_arg);
-		mono_mb_emit_ldarg (mb, argnum);
-		mono_mb_emit_managed_call (mb, destroy_method, NULL);
+		destroy_method = mono_class_get_method_from_name_checked (target_class, "<MarshalDestroy>", 1, METHOD_ATTRIBUTE_SPECIAL_NAME, error);
+		mono_error_assert_ok (error);
+
+		if (destroy_method)
+		{
+			// .NET Framework destroys arg, not conv_arg. This makes no sense, but we duplicate the bug here.
+			// In a sensible universe, this would be: mono_mb_emit_ldloc_addr (mb, conv_arg);
+			mono_mb_emit_ldarg (mb, argnum);
+			mono_mb_emit_managed_call (mb, destroy_method, NULL);
+		}
 
 		break;
 	}
