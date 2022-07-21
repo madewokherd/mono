@@ -3383,6 +3383,26 @@ mono_class_setup_methods (MonoClass *klass)
 		int slot = 0;
 		/*Only assign slots to virtual methods as interfaces are allowed to have static methods.*/
 		for (i = 0; i < count; ++i) {
+#ifndef DISABLE_COM
+			if (!strncmp(methods [i]->name, "_VtblGap", 8) && MONO_CLASS_IS_IMPORT (klass))
+			{
+				int gap_index, gap_length;
+
+				if (sscanf(methods [i]->name + 8, "%d_%d", &gap_index, &gap_length) != 2
+						|| gap_index <= 0 || gap_length <= 0)
+				{
+					mono_class_set_type_load_failure (klass, "Invalid _VtblGap special name %s", methods [i]->name);
+				}
+				else
+				{
+					methods [i]->flags = METHOD_ATTRIBUTE_VIRTUAL | METHOD_ATTRIBUTE_HIDE_BY_SIG | METHOD_ATTRIBUTE_ABSTRACT;
+					methods [i]->iflags = 0;
+					methods [i]->slot = slot;
+					slot += gap_length;
+					continue;
+				}
+			}
+#endif
 			if (methods [i]->flags & METHOD_ATTRIBUTE_VIRTUAL)
 			{
 				if (method_is_reabstracted (methods[i]->flags)) {
