@@ -627,6 +627,10 @@ namespace System.Configuration
 				if (value.Property.Attributes.Contains (typeof (ApplicationScopedSettingAttribute)))
 					continue;
 
+				// Don't try to save unchanged values.
+				if (!value.IsDirty)
+					continue;
+
 				hasChanges = true;
 				SettingElement element = userSection.Settings.Get (value.Name);
 				if (element == null) {
