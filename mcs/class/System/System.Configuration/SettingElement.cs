@@ -95,11 +95,8 @@ namespace System.Configuration
 
 		public override bool Equals (object settings)
 		{
-			SettingElement e = settings as SettingElement;
-			if (e == null)
-				return false;
-
-			return e.SerializeAs == SerializeAs && e.Value == Value && e.Name == Name;
+			SettingElement u = settings as SettingElement;
+			return (u != null && base.Equals(settings) && Object.Equals(u.Value, Value));
 		}
 
 		public override int GetHashCode ()
