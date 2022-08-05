@@ -80,7 +80,8 @@ namespace System.Configuration
 
 		public override bool Equals (object settingValue)
 		{
-			throw new NotImplementedException ();
+			SettingValueElement u = settingValue as SettingValueElement;
+			return (u != null && Object.Equals(u.ValueXml, ValueXml)); 
 		}
 
 		public override int GetHashCode ()
