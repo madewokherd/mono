@@ -509,8 +509,28 @@ namespace System.Configuration
 
 				if (saveContext == null)
 					throw new InvalidOperationException ();
-				if (!saveContext.HasValue (prop))
-					continue;
+
+				// Commenting this out, because "HasValue" checks if a property should be saved
+				// but this was already done by calling "HasValues" in SerializeToXmlElement
+				// additonally "HasValue" has the issue that it only checks if this property,
+				// a XML-Attribute (prop.IsElement == true), is different to the parent attribute
+				// but this is unlikely/never? going to happen because a change to an XML-attribute
+				// on a ConfigurationElement would mean it's a completely different setting.
+				//
+				// As reference: 
+				// <setting name="SettingBool1" serializeAs="String">
+				//     <value>True</value>
+				// </setting>
+				//
+				// Also, if the name attr didn't change but the inner <value> tag did, we'd write out
+				// the setting element without its attributes, which is not correct. "HasValues" checks for
+				// the inner <value> element, "HasValue" doesn't, that's why we leave it out here.
+				// Also if an element is serialized (which already happened at this point),
+				// it doesn't make sense to just not write out it's attrs
+				// when the element itself is already written to the XML tree...
+				//
+				// if (!saveContext.HasValue (prop))
+				//     continue;
 
 				writer.WriteAttributeString (prop.Name, prop.GetStringValue ());
 				wroteData = true;
@@ -572,20 +592,24 @@ namespace System.Configuration
 
 				object parentValue = parentElement [prop.Name];
 				if (!prop.IsElement) {
-					if (!object.Equals (sourceValue, parentValue) || 
-					    (saveMode == ConfigurationSaveMode.Full) ||
-					    (saveMode == ConfigurationSaveMode.Modified && prop.ValueOrigin == PropertyValueOrigin.SetHere))
-						unmergedProp.Value = sourceValue;
+					unmergedProp.Value = sourceValue;
 					continue;
 				}
 
 				var sourceElementValue = (ConfigurationElement) sourceValue;
-				if (isMinimalOrModified && !sourceElementValue.IsModified ())
-					continue;
+				bool umergeChild = false;
+
 				if (parentValue == null) {
 					unmergedProp.Value = sourceValue;
-					continue;
+					umergeChild = true;
 				}
+				if ((!object.Equals (sourceElementValue, parentValue) && isMinimalOrModified) || saveMode == ConfigurationSaveMode.Full) {
+					unmergedProp.Value = sourceValue;
+					umergeChild = true;
+				}
+
+				if (!umergeChild)
+					continue;
 
 				var parentElementValue = (ConfigurationElement) parentValue;
 				ConfigurationElement copy = (ConfigurationElement) unmergedProp.Value;
@@ -700,8 +724,14 @@ namespace System.Configuration
 		{
 			if (mode == ConfigurationSaveMode.Full)
 				return true;
-			if (modified && (mode == ConfigurationSaveMode.Modified))
+
+			if (modified && (mode == ConfigurationSaveMode.Modified || mode == ConfigurationSaveMode.Minimal))
 				return true;
+
+			if ((!object.Equals (this, parent) 
+				&& (mode == ConfigurationSaveMode.Modified || mode == ConfigurationSaveMode.Minimal))
+					|| mode == ConfigurationSaveMode.Full)
+						return true;
 			
 			foreach (PropertyInformation prop in ElementInformation.Properties) {
 				if (HasValue (parent, prop, mode))
