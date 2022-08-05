@@ -39,6 +39,7 @@ namespace System.Configuration
 		: ConfigurationElement
 #endif
 	{
+		private bool isModified = false;
 #if XML_DEP
 		XmlNode node;
 
@@ -64,8 +65,13 @@ namespace System.Configuration
 
 #if (XML_DEP)
 		public XmlNode ValueXml {
-			get { return node; }
-			set { node = value; }
+			get {
+				return node;
+			}
+			set {
+				node = value;
+				isModified = true;
+			}
 		}
 
 #if (CONFIGURATION_DEP)
@@ -92,7 +98,7 @@ namespace System.Configuration
 #if (CONFIGURATION_DEP)
 		protected override bool IsModified ()
 		{
-			return original != node;
+			return isModified;
 		}
 
 		protected override void Reset (ConfigurationElement parentElement)
@@ -102,7 +108,7 @@ namespace System.Configuration
 
 		protected override void ResetModified ()
 		{
-			node = original;
+			isModified = false;
 		}
 #endif
 
