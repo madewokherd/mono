@@ -28,7 +28,6 @@
 #endif
 #ifdef __linux__
 #include <sys/ioctl.h>
-#include <linux/fs.h>
 #include <mono/utils/linux_magic.h>
 #endif
 #ifdef _AIX
