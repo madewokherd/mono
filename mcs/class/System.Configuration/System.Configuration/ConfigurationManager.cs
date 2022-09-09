@@ -100,8 +100,8 @@ namespace System.Configuration {
 			return Path.Combine (company_name, product_name, version);
 		}
 
-		internal static Configuration OpenExeConfigurationInternal (ConfigurationUserLevel userLevel, Assembly calling_assembly, string exePath)
-		{
+		internal static ExeConfigurationFileMap GetDefaultExeFileMap(Assembly calling_assembly, string exePath,
+			ConfigurationUserLevel userLevel) {
 			ExeConfigurationFileMap map = new ExeConfigurationFileMap ();
 
 			/* Roaming and RoamingAndLocal should be different
@@ -134,9 +134,15 @@ namespace System.Configuration {
 				map.LocalUserConfigFilename = Path.Combine (Environment.GetFolderPath (Environment.SpecialFolder.LocalApplicationData), GetAssemblyInfo(calling_assembly));
 				map.LocalUserConfigFilename = Path.Combine (map.LocalUserConfigFilename, "user.config");
 				goto case ConfigurationUserLevel.PerUserRoaming;
-			}
+ 			}
 
-			return ConfigurationFactory.Create (typeof(ExeConfigurationHost), map, userLevel);
+			return map;
+		}
+
+		internal static Configuration OpenExeConfigurationInternal (ConfigurationUserLevel userLevel, Assembly calling_assembly, string exePath)
+		{
+			return ConfigurationFactory.Create (typeof(ExeConfigurationHost),
+				GetDefaultExeFileMap(calling_assembly, exePath, userLevel), userLevel);
 		}
 
 		public static Configuration OpenExeConfiguration (ConfigurationUserLevel userLevel)
@@ -149,9 +155,11 @@ namespace System.Configuration {
 			return OpenExeConfigurationInternal (ConfigurationUserLevel.None, Assembly.GetEntryAssembly () ?? Assembly.GetCallingAssembly (), exePath);
 		}
 
-		[MonoLimitation("ConfigurationUserLevel parameter is not supported.")]
 		public static Configuration OpenMappedExeConfiguration (ExeConfigurationFileMap fileMap, ConfigurationUserLevel userLevel)
 		{
+			if (fileMap is null) {
+				fileMap = GetDefaultExeFileMap(Assembly.GetEntryAssembly () ?? Assembly.GetCallingAssembly (), null, userLevel);
+			}
 			return ConfigurationFactory.Create (typeof(ExeConfigurationHost), fileMap, userLevel);
 		}
 
