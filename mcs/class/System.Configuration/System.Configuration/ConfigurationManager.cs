@@ -165,12 +165,13 @@ namespace System.Configuration {
 
 		public static Configuration OpenMachineConfiguration ()
 		{
-			ConfigurationFileMap map = new ConfigurationFileMap ();
-			return ConfigurationFactory.Create (typeof(MachineConfigurationHost), map);
+			return OpenMappedMachineConfiguration (null);
 		}
 		
 		public static Configuration OpenMappedMachineConfiguration (ConfigurationFileMap fileMap)
 		{
+			if (fileMap is null)
+				fileMap = new ConfigurationFileMap ();
 			return ConfigurationFactory.Create (typeof(MachineConfigurationHost), fileMap);
 		}
 		
