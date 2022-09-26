@@ -1919,7 +1919,10 @@ target_type_is_incompatible (MonoCompile *cfg, MonoType *target, MonoInst *arg)
 		 * in native int. (#688008).
 		 */
 		if (arg->type != STACK_I4 && arg->type != STACK_PTR && arg->type != STACK_MP)
-			return 1;
+#if SIZEOF_VOID_P == 8
+			if (arg->type != STACK_I8)
+#endif
+				return 1;
 		return 0;
 	case MONO_TYPE_CLASS:
 	case MONO_TYPE_STRING:
