@@ -269,6 +269,7 @@ net_4_x_dirs := \
 #  Mono.Data.Tds - unused
 #  Mono.Debugger.Soft - unused, and it's unclear whether an application-provided version would be compatible
 #  Mono.Management - was used by csharp.exe but can't work on Windows
+#  Mono.Parallel - unused
 
 net_4_x_parallel_dirs = \
 	System.Security			\
@@ -348,7 +349,6 @@ net_4_x_parallel_dirs = \
 	Mono.Options 			\
 	Mono.Simd			\
 	Mono.Tasklets       		\
-	Mono.Parallel \
 	Mono.Security.Win32		\
 	Mono.Messaging.RabbitMQ		\
 	System.Dynamic			\
