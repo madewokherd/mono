@@ -270,6 +270,7 @@ net_4_x_dirs := \
 #  Mono.Debugger.Soft - unused, and it's unclear whether an application-provided version would be compatible
 #  Mono.Management - was used by csharp.exe but can't work on Windows
 #  Mono.Parallel - unused
+#  Mono.Options - all users just include the source code
 
 net_4_x_parallel_dirs = \
 	System.Security			\
@@ -346,7 +347,6 @@ net_4_x_parallel_dirs = \
 	Mono.Cecil			\
 	Mono.Cecil.Mdb			\
 	Mono.C5				\
-	Mono.Options 			\
 	Mono.Simd			\
 	Mono.Tasklets       		\
 	Mono.Security.Win32		\
