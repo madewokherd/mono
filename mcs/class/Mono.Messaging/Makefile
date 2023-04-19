@@ -2,7 +2,7 @@ thisdir = class/Mono.Messaging
 SUBDIRS = 
 include ../../build/rules.make
 
-LIBRARY = Mono.Messaging.dll
+LIBRARY = WineMono.Messaging.dll
 
 LIB_REFS = System System.Configuration
 KEYFILE = ../mono.pub

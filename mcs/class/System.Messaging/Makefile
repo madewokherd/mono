@@ -3,7 +3,7 @@ SUBDIRS =
 include ../../build/rules.make
 
 LIBRARY = System.Messaging.dll
-LIB_REFS = System System.Xml Mono.Messaging System.Configuration.Install
+LIB_REFS = System System.Xml System.Configuration.Install
 
 ifndef NO_SYSTEM_DRAWING_DEPENDENCY
 LIB_REFS += System.Drawing
@@ -21,5 +21,8 @@ LIB_MCS_FLAGS += -d:NO_WINFORMS_DEPENDENCY
 else
 LIB_REFS += System.Windows.Forms
 endif
+
+DEP_LIBS = $(LIB_REFS) WineMono.Messaging 
+DEP_DIRS = $(LIB_REFS) Mono.Messaging 
 
 include ../../build/library.make
