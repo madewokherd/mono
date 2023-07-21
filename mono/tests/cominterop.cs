@@ -377,6 +377,9 @@ public class Tests
 	public static extern int mono_test_marshal_safearray_in_ccw([MarshalAs (UnmanagedType.Interface)] ITest itest);
 
 	[DllImport("libtest")]
+	public static extern int mono_test_marshal_safearray_out_ccw([MarshalAs (UnmanagedType.Interface)] ITest itest);
+
+	[DllImport("libtest")]
 	public static extern int mono_test_marshal_lparray_out_ccw([MarshalAs (UnmanagedType.Interface)] ITest itest);
 
 	[DllImport("libtest")]
@@ -972,6 +975,8 @@ public class Tests
 					return 97;
 				if (mono_test_marshal_lparray_out_ccw(test) != 0)
 					return 98;
+				if (mono_test_marshal_safearray_out_ccw(test) != 0)
+					return 99;
 			}
 			#endregion // SafeArray Tests
 
@@ -1192,6 +1197,8 @@ public class Tests
 		[MethodImplAttribute (MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
 		[PreserveSig ()]
 		int PointClassWithoutExplicitLayout ([MarshalAs(UnmanagedType.Interface), In, Out] PointWithoutExplicitLayout pt);
+		[MethodImplAttribute (MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
+		int[] SafeArrayOut ();
 	}
 
 	[ComImport ()]
@@ -1330,6 +1337,8 @@ public class Tests
 		[MethodImplAttribute (MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
 		[PreserveSig ()]
 		public virtual extern int PointClassWithoutExplicitLayout ([MarshalAs(UnmanagedType.Interface), In, Out] PointWithoutExplicitLayout pt);
+		[MethodImplAttribute (MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
+		public virtual extern int[] SafeArrayOut ();
 	}
 
 	[System.Runtime.InteropServices.GuidAttribute ("00000000-0000-0000-0000-000000000002")]
@@ -1721,6 +1730,11 @@ public class Tests
 		{
 			return 0;
 		}
+
+		public int[] SafeArrayOut ()
+		{
+			return new int[]{1, 2, 3, 4, 5};
+		}
 	}
 
 	[ComVisible (true)]
@@ -2008,8 +2022,16 @@ public class Tests
 			if (itest.PointClassWithoutExplicitLayout (pt3) != 0)
 				return 1;
 
-			if (isWindows)
+			if (isWindows) {
+				int[] safeArray = itest.SafeArrayOut();
+				if (safeArray.Length != 5)
+					return 1;
+				for (int i=0; i<5; i++)
+					if (safeArray[i] != i+1)
+						return 1;
+
 				itest.ArrayIn2 (new object[] { "Test", 2345 });
+			}
 		}
 		catch (Exception ex) {
 			return 1;

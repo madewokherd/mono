@@ -3585,6 +3585,7 @@ typedef struct
 	point* (STDCALL *PointClassRet)(MonoComObject* pUnk);
 	void (STDCALL *PointClassWithIface)(MonoComObject* pUnk, point *pt);
 	int (STDCALL *PointClassWithoutExplicitLayout)(MonoComObject* pUnk, MonoComObject *obj);
+	int (STDCALL *SafeArrayOut)(MonoComObject* pUnk, gpointer *safearray);
 } MonoIUnknown;
 
 struct MonoComObject
@@ -3846,6 +3847,29 @@ PointClassWithoutExplicitLayout(MonoComObject* pUnk, MonoComObject *obj)
 	return 0;
 }
 
+LIBTEST_API int STDCALL
+SafeArrayOut(MonoComObject* pUnk, gpointer *safearray)
+{
+#ifdef WIN32
+	SAFEARRAY *sa;
+	SAFEARRAYBOUND rgsabound = {5, 0};
+	LONG idx;
+	INT value;
+	sa = SafeArrayCreate(VT_I4, 1, &rgsabound);
+	if (!sa)
+		return 1;
+	for (idx = 0; idx < 5; idx++)
+	{
+		value = idx + 1;
+		SafeArrayPutElement(sa, &idx, &value);
+	}
+	*safearray = sa;
+	return 0;
+#else
+	return 0x80004005;
+#endif
+}
+
 static void create_com_object (MonoComObject** pOut);
 
 LIBTEST_API int STDCALL 
@@ -3891,6 +3915,7 @@ static void create_com_object (MonoComObject** pOut)
 	(*pOut)->vtbl->PointClassRet = PointClassRet;
 	(*pOut)->vtbl->PointClassWithIface = PointClassWithIface;
 	(*pOut)->vtbl->PointClassWithoutExplicitLayout = PointClassWithoutExplicitLayout;
+	(*pOut)->vtbl->SafeArrayOut = SafeArrayOut;
 }
 
 static MonoComObject* same_object = NULL;
@@ -6328,6 +6353,56 @@ mono_test_marshal_safearray_in_ccw(MonoComObject *pUnk)
 		ret = pUnk->vtbl->ArrayIn3 (pUnk, (void *)array);
 
 	SafeArrayDestroy(array);
+
+	return ret;
+}
+
+LIBTEST_API int STDCALL
+mono_test_marshal_safearray_out_ccw(MonoComObject *pUnk)
+{
+	SAFEARRAY *sa;
+	int ret;
+
+	ret = pUnk->vtbl->SafeArrayOut(pUnk, (gpointer*)&sa);
+	if (!ret) {
+		if (SafeArrayGetDim(sa) != 1)
+			ret = 1;
+
+		if (!ret) {
+			VARTYPE vt;
+			ret = SafeArrayGetVartype(sa, &vt);
+			if (!ret && vt != VT_I4)
+				ret = 2;
+		}
+
+		if (!ret) {
+			LONG lbound;
+			ret = SafeArrayGetLBound(sa, 1, &lbound);
+			if (!ret && lbound != 0)
+				ret = 3;
+		}
+
+		if (!ret) {
+			LONG ubound;
+			ret = SafeArrayGetUBound(sa, 1, &ubound);
+			if (!ret && ubound != 4)
+				ret = 4;
+		}
+
+		if (!ret) {
+			ret = SafeArrayLock(sa);
+			if (!ret) {
+				int i;
+				for (i=0; i<5; i++)
+					if (((INT*)sa->pvData)[i] != i+1)
+						ret = 5 + i;
+
+				SafeArrayUnlock(sa);
+			}
+		}
+
+		SafeArrayDestroy(sa);
+	}
 
 	return ret;
 }
