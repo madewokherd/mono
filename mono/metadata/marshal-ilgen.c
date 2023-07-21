@@ -2761,11 +2761,6 @@ emit_marshal_array_ilgen (EmitMarshalContext *m, int argnum, MonoType *t,
 		conv_arg = mono_mb_add_local (mb, object_type);
 		*conv_arg_type = int_type;
 
-		if (t->byref) {
-			char *msg = g_strdup ("Byref array marshalling to managed code is not implemented.");
-			mono_mb_emit_exception_marshal_directive (mb, msg);
-			return conv_arg;
-		}
 		if (!spec) {
 			char *msg = g_strdup ("[MarshalAs] attribute required to marshal arrays to managed code.");
 			mono_mb_emit_exception_marshal_directive (mb, msg);
@@ -2774,9 +2769,19 @@ emit_marshal_array_ilgen (EmitMarshalContext *m, int argnum, MonoType *t,
 
 		switch (spec->native) {
 		case MONO_NATIVE_LPARRAY:
+			if (t->byref) {
+				char *msg = g_strdup ("Byref array marshalling to managed code is not implemented.");
+				mono_mb_emit_exception_marshal_directive (mb, msg);
+				return conv_arg;
+			}
 			break;
 		case MONO_NATIVE_SAFEARRAY:
 #ifndef DISABLE_COM
+			if (t->byref && t->attrs & PARAM_ATTRIBUTE_IN) {
+				char *msg = g_strdup ("Input byref safearray marshalling to managed code is not implemented.");
+				mono_mb_emit_exception_marshal_directive (mb, msg);
+				return conv_arg;
+			}
 			return mono_cominterop_emit_marshal_safearray (m, argnum, t, spec, conv_arg, conv_arg_type, action);
 #endif
 		default: {
