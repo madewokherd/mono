@@ -3371,6 +3371,7 @@ ptr_type_is_copy_constructed (MonoType *type)
 	return FALSE;
 }
 
+/* See marshal-action.txt for an explanation of the MarshalAction constants */
 int
 mono_emit_marshal (EmitMarshalContext *m, int argnum, MonoType *t, 
 	      MonoMarshalSpec *spec, int conv_arg, 

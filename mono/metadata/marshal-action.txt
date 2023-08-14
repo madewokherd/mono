@@ -1,0 +1,66 @@
+Because this takes me forever to figure out every time I have to work with marshaling, here is the meaning of every MarshalAction constant.
+
+MARSHAL_ACTION_CONV_IN:
+
+Converts a managed value to an unmanaged value that can later be pushed on the stack. May create a local variable and return its index, which will be passed to other actions via conv_arg.
+
+argnum = index of an argument containing the managed value
+conv_arg = 0
+conv_arg_type = out parameter, used to return the type of this argument in the unmanaged function signature
+
+MARSHAL_ACTION_PUSH:
+
+Push an unmanaged value from MARSHAL_ACTION_CONV_IN onto the stack.
+
+argnum = index of an argument containing the managed value
+conv_arg = return value from MARSHAL_ACTION_CONV_IN
+conv_arg_type = NULL
+
+MARSHAL_ACTION_CONV_RESULT:
+
+Convert the return value of an unmanaged function, currently on the stack, to a managed value. Store the managed value in local with index 3.
+
+NOTE: emit_native_wrapper_ilgen may not call mono_emit_marshal depending on the type.
+
+argnum = 0
+conv_arg = 0
+conv_arg_type = NULL
+
+MARSHAL_ACTION_CONV_OUT:
+
+Convert an unmanaged output argument value to a managed value.
+
+NOTE: emit_native_wrapper_ilgen may not call mono_emit_marshal depending on the type.
+
+argnum = index of an argument that will accept the managed value
+conv_arg = return value from MARSHAL_ACTION_CONV_IN
+conv_arg_type = NULL
+
+MARSHAL_ACTION_MANAGED_CONV_IN:
+
+Convert an unmanaged input value to a managed input value. Returns the index of a local that contains the managed input value. The contents of this local (or the address in the case of a byref argument) will be passed directly to the managed method.
+
+NOTE: emit_managed_wrapper_ilgen may not call mono_emit_marshal depending on the type.
+
+argnum = index of an argument containing the unmanaged value
+conv_arg = 0
+conv_arg_type = out parameter, accepts a type for this argument in the unmanaged signature
+
+MARSHAL_ACTION_MANAGED_CONV_RESULT:
+
+Convert the return value of a managed function, currently on the stack, to an unmanaged value. Store the unmanaged value in local with index 3.
+
+NOTE: emit_managed_wrapper_ilgen may not call mono_emit_marshal depending on the type.
+
+argnum = 0
+conv_arg = 0
+conv_art_type = NULL
+
+MARSHAL_ACTION_MANAGED_CONV_OUT:
+
+Convert a managed output argument value to an unmanaged value.
+
+argnum = index of an argument that will accept the unmanaged value
+conv_arg = return value from MARSHAL_ACTION_MANAGED_CONV_IN, which is the index of a local that now contains the managed value
+conv_arg_type = NULL
+
