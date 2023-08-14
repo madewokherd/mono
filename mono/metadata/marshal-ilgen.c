@@ -2950,12 +2950,11 @@ emit_marshal_array_ilgen (EmitMarshalContext *m, int argnum, MonoType *t,
 		MonoMarshalConv conv;
 		gboolean is_string = FALSE;
 
-		if (!spec)
+		if (!spec || t->byref)
 			/* Already handled in CONV_IN */
 			break;
 		
 		/* These are already checked in CONV_IN */
-		g_assert (!t->byref);
 		g_assert (spec->native == MONO_NATIVE_LPARRAY);
 		g_assert (t->attrs & PARAM_ATTRIBUTE_OUT);
 
@@ -6564,6 +6563,7 @@ emit_managed_wrapper_ilgen (MonoMethodBuilder *mb, MonoMethodSignature *invoke_s
 			case MONO_TYPE_OBJECT:
 			case MONO_TYPE_STRING:
 			case MONO_TYPE_BOOLEAN:
+			case MONO_TYPE_SZARRAY:
 				mono_emit_marshal (m, i, t, mspecs [i + 1], tmp_locals [i], NULL, MARSHAL_ACTION_MANAGED_CONV_OUT);
 				break;
 			default:

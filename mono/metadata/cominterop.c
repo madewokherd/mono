@@ -4249,13 +4249,19 @@ mono_cominterop_emit_marshal_safearray (EmitMarshalContext *m, int argnum, MonoT
 		break;
 	}
 	case MARSHAL_ACTION_MANAGED_CONV_IN: {
-		if ((t->attrs & (PARAM_ATTRIBUTE_IN | PARAM_ATTRIBUTE_OUT)) == PARAM_ATTRIBUTE_OUT)
-			break;
-
 		MonoType *object_type = mono_get_object_type ();
 		MonoType *int_type = mono_get_int_type ();
 		*conv_arg_type = int_type;
 		conv_arg = mono_mb_add_local (mb, object_type);
+
+		if ((t->attrs & (PARAM_ATTRIBUTE_IN | PARAM_ATTRIBUTE_OUT)) == PARAM_ATTRIBUTE_OUT)
+			break;
+
+		if (t->byref) {
+			char *msg = g_strdup ("Byref input safearray marshaling not implemented");
+			mono_mb_emit_exception_full (mb, "System.Runtime.InteropServices", "MarshalDirectiveException", msg);
+			return conv_arg;
+		}
 
 		/* conv = mono_marshal_safearray_to_array (safearray, typeof(conv), elem_type, NULL); */
 		mono_mb_emit_ldarg (mb, argnum);
@@ -4267,6 +4273,21 @@ mono_cominterop_emit_marshal_safearray (EmitMarshalContext *m, int argnum, MonoT
 
 		break;
 	}
+	case MARSHAL_ACTION_MANAGED_CONV_OUT: {
+		if (t->attrs & PARAM_ATTRIBUTE_OUT) {
+			g_assert (t->byref);
+
+			/* *argnum = mono_marshal_safearray_from_array(conv_arg, elem_type) */
+			mono_mb_emit_ldarg (mb, argnum);
+			mono_mb_emit_ldloc (mb, conv_arg);
+			mono_mb_emit_icon (mb, elem_type);
+			mono_mb_emit_icall (mb, mono_marshal_safearray_from_array);
+			mono_mb_emit_byte (mb, CEE_STIND_I);
+		}
+
+		break;
+	}
+
 	default:
 		g_assert_not_reached ();
 	}

@@ -3427,6 +3427,7 @@ mono_emit_marshal (EmitMarshalContext *m, int argnum, MonoType *t,
 				case MARSHAL_ACTION_CONV_IN:
 				case MARSHAL_ACTION_PUSH:
 				case MARSHAL_ACTION_MANAGED_CONV_IN:
+				case MARSHAL_ACTION_MANAGED_CONV_OUT:
 					return mono_cominterop_emit_marshal_safearray (m, argnum, t, spec, conv_arg, conv_arg_type, action);
 			}
 		}
