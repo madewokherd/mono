@@ -4252,6 +4252,11 @@ mono_cominterop_emit_marshal_safearray (EmitMarshalContext *m, int argnum, MonoT
 		if ((t->attrs & (PARAM_ATTRIBUTE_IN | PARAM_ATTRIBUTE_OUT)) == PARAM_ATTRIBUTE_OUT)
 			break;
 
+		MonoType *object_type = mono_get_object_type ();
+		MonoType *int_type = mono_get_int_type ();
+		*conv_arg_type = int_type;
+		conv_arg = mono_mb_add_local (mb, object_type);
+
 		/* conv = mono_marshal_safearray_to_array (safearray, typeof(conv), elem_type, NULL); */
 		mono_mb_emit_ldarg (mb, argnum);
 		mono_mb_emit_ptr (mb, mono_class_from_mono_type_internal (t));
