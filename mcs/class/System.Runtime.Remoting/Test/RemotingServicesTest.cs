@@ -379,6 +379,61 @@ namespace MonoTests.Remoting
 			}
 		}
 
+		[Test]
+		public void Reregister ()
+		{
+			var port = NetworkHelpers.FindFreePort ();
+			IDictionary props = new Hashtable ();
+			props ["port"] = port;
+			props ["bindTo"] = "127.0.0.1";
+			TcpChannel chn = new TcpChannel (props, null, null);
+			ChannelServices.RegisterChannel (chn);
+			try {
+				MarshalObject objMarshal = NewMarshalObject ();
+
+				RemotingConfiguration.RegisterWellKnownServiceType (typeof (MarshalObject), objMarshal.Uri, WellKnownObjectMode.SingleCall);
+				bool found = false;
+				foreach (WellKnownServiceTypeEntry entry in RemotingConfiguration.GetRegisteredWellKnownServiceTypes ())
+				{
+					if (entry.ObjectUri == objMarshal.Uri)
+					{
+						Assert.AreEqual (WellKnownObjectMode.SingleCall, entry.Mode, "found 1");
+						Assert.IsFalse (found, "found 1");
+						found = true;
+					}
+				}
+				Assert.IsTrue (found, "found 1");
+
+				RemotingConfiguration.RegisterWellKnownServiceType (typeof (MarshalObject), objMarshal.Uri, WellKnownObjectMode.SingleCall);
+				found = false;
+				foreach (WellKnownServiceTypeEntry entry in RemotingConfiguration.GetRegisteredWellKnownServiceTypes ())
+				{
+					if (entry.ObjectUri == objMarshal.Uri)
+					{
+						Assert.AreEqual (WellKnownObjectMode.SingleCall, entry.Mode, "found 2");
+						Assert.IsFalse (found, "found 2");
+						found = true;
+					}
+				}
+				Assert.IsTrue (found, "found 2");
+
+				RemotingConfiguration.RegisterWellKnownServiceType (typeof (MarshalObject), objMarshal.Uri, WellKnownObjectMode.Singleton);
+				found = false;
+				foreach (WellKnownServiceTypeEntry entry in RemotingConfiguration.GetRegisteredWellKnownServiceTypes ())
+				{
+					if (entry.ObjectUri == objMarshal.Uri)
+					{
+						Assert.AreEqual (WellKnownObjectMode.Singleton, entry.Mode, "found 3");
+						Assert.IsFalse (found, "found 3");
+						found = true;
+					}
+				}
+				Assert.IsTrue (found, "found 3");
+			} finally {
+				ChannelServices.UnregisterChannel (chn);
+			}
+		}
+
 		// Tests the IsOneWay method
 		[Test]
 		public void IsOneWay ()

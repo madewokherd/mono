@@ -737,9 +737,6 @@ namespace System.Runtime.Remoting
 		{
 			lock (uri_hash)
 			{
-				if (uri_hash.ContainsKey (identity.ObjectUri)) 
-					throw new RemotingException ("Uri already in use: " + identity.ObjectUri + ".");
-
 				uri_hash[identity.ObjectUri] = identity;
 			}
 		}
