@@ -1,12 +1,14 @@
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace Microsoft.Win32
 {
 	static class Win32Native
 	{
 		internal const string ADVAPI32 = "advapi32.dll";
+        internal const String KERNEL32 = "kernel32.dll";
 
 		// Error codes from WinError.h
 		internal const int ERROR_SUCCESS = 0x0;
@@ -79,5 +81,38 @@ namespace Microsoft.Win32
 			internal int dwFileAttributes = 0;
 			internal String cFileName = null;
 		}
+
+        // From WinBase.h
+        internal const int SEM_FAILCRITICALERRORS = 1;
+
+        [DllImport(KERNEL32, CharSet=CharSet.Auto, SetLastError=true, BestFitMapping=false)]
+        internal static extern bool GetVolumeInformation(String drive, [Out]StringBuilder volumeName, int volumeNameBufLen, out int volSerialNumber, out int maxFileNameLen, out int fileSystemFlags, [Out]StringBuilder fileSystemName, int fileSystemNameBufLen);
+
+        [DllImport(KERNEL32, CharSet=CharSet.Auto, SetLastError=true, BestFitMapping=false)]
+        internal static extern bool SetVolumeLabel(String driveLetter, String volumeName);
+
+        [DllImport(KERNEL32, SetLastError=false, EntryPoint="SetErrorMode", ExactSpelling=true)]
+        private static extern int SetErrorMode_VistaAndOlder(int newMode);
+
+        [DllImport(KERNEL32, SetLastError=true, EntryPoint="SetThreadErrorMode")]
+        private static extern bool SetErrorMode_Win7AndNewer(int newMode, out int oldMode);
+
+        // RTM versions of Win7 and Windows Server 2008 R2
+        private static readonly Version ThreadErrorModeMinOsVersion = new Version(6, 1, 7600);
+
+        // this method uses the thread-safe version of SetErrorMode on Windows 7 / Windows Server 2008 R2 operating systems.
+        // 
+        internal static int SetErrorMode(int newMode)
+        {
+#if !FEATURE_CORESYSTEM // ARMSTUB
+            if (Environment.OSVersion.Version >= ThreadErrorModeMinOsVersion)
+            {
+                int oldMode;
+                SetErrorMode_Win7AndNewer(newMode, out oldMode);
+                return oldMode;
+            }
+#endif
+            return SetErrorMode_VistaAndOlder(newMode);
+        }
 	}
 }

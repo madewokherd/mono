@@ -21,6 +21,7 @@
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
+using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -106,7 +107,61 @@ namespace System.IO {
 			}
 		}
 
-		[MonoTODO ("Currently get only works on Mono/Unix; set not implemented")]
+#if PLATFORM_WINDOWS
+        // Null is a valid volume label.
+        public String VolumeLabel {
+            get {
+                // NTFS uses a limit of 32 characters for the volume label,
+                // as of Windows Server 2003.
+                const int volNameLen = 50;
+                StringBuilder volumeName = new StringBuilder(volNameLen);
+                const int fileSystemNameLen = 50;
+                StringBuilder fileSystemName = new StringBuilder(fileSystemNameLen);
+                int serialNumber, maxFileNameLen, fileSystemFlags;
+                
+                int oldMode = Win32Native.SetErrorMode(Win32Native.SEM_FAILCRITICALERRORS);
+                try {
+                    bool r = Win32Native.GetVolumeInformation(Name, volumeName, volNameLen, out serialNumber, out maxFileNameLen, out fileSystemFlags, fileSystemName, fileSystemNameLen);
+                    if (!r) {
+                        int errorCode = Marshal.GetLastWin32Error();
+                        // Win9x appears to return ERROR_INVALID_DATA when a
+                        // drive doesn't exist.
+                        if (errorCode == Win32Native.ERROR_INVALID_DATA)
+                            errorCode = Win32Native.ERROR_INVALID_DRIVE;
+						if (errorCode == Win32Native.ERROR_PATH_NOT_FOUND || errorCode == Win32Native.ERROR_INVALID_DRIVE)
+							throw new DriveNotFoundException(Name);
+						if (errorCode != 0)
+							Marshal.ThrowExceptionForHR(Win32Native.MakeHRFromErrorCode(errorCode));
+                    }
+                }
+                finally {
+                    Win32Native.SetErrorMode(oldMode);
+                }
+                return volumeName.ToString();
+            }
+            set {
+                String demandPath = Name + '.';
+
+                int oldMode = Win32Native.SetErrorMode(Win32Native.SEM_FAILCRITICALERRORS);
+                try {
+                    bool r = Win32Native.SetVolumeLabel(Name, value);
+                    if (!r) {
+                        int errorCode = Marshal.GetLastWin32Error();
+                        // Provide better message
+                        if (errorCode == Win32Native.ERROR_ACCESS_DENIED)
+                            throw new UnauthorizedAccessException(Environment.GetResourceString("InvalidOperation_SetVolumeLabelFailed"));
+						if (errorCode == Win32Native.ERROR_PATH_NOT_FOUND || errorCode == Win32Native.ERROR_INVALID_DRIVE)
+							throw new DriveNotFoundException(Name);
+						if (errorCode != 0)
+							Marshal.ThrowExceptionForHR(Win32Native.MakeHRFromErrorCode(errorCode));
+                    }
+                }
+                finally {
+                    Win32Native.SetErrorMode(oldMode);
+                }
+            }
+        }
+#else
 		public string VolumeLabel {
 			get {
 				return path;
@@ -115,6 +170,7 @@ namespace System.IO {
 				throw new NotImplementedException ();
 			}
 		}
+#endif
 		
 		public string DriveFormat {
 			get {
