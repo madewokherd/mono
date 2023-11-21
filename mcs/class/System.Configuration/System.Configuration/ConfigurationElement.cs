@@ -30,6 +30,7 @@
 //
 
 using System.Collections;
+using System.Collections.Generic;
 using System.Xml;
 using System.Reflection;
 using System.IO;
@@ -41,7 +42,6 @@ namespace System.Configuration
 	{
 		string rawXml;
 		bool modified;
-		ElementMap map;
 		ConfigurationPropertyCollection keyProps;
 		ConfigurationElementCollection defaultCollection;
 		bool readOnly;
@@ -52,6 +52,139 @@ namespace System.Configuration
 
 		/* Start of referencesource code. */
 		internal static readonly Object s_nullPropertyValue = new Object();
+		private static ConfigurationElementProperty s_ElementProperty =
+			new ConfigurationElementProperty(new DefaultValidator());
+		private static readonly Hashtable s_propertyBags = new Hashtable();
+		private static volatile Dictionary<Type,ConfigurationValidatorBase> s_perTypeValidators;
+		private ConfigurationElementProperty	_elementProperty = s_ElementProperty;
+
+		private static bool PropertiesFromType(Type type, out ConfigurationPropertyCollection result) {
+			ConfigurationPropertyCollection properties = (ConfigurationPropertyCollection)s_propertyBags[type];
+			result = null;
+			bool firstTimeInit = false;
+			if (properties == null) {
+				lock (s_propertyBags.SyncRoot) {
+					properties = (ConfigurationPropertyCollection)s_propertyBags[type];
+					if (properties == null) {
+						properties = CreatePropertyBagFromType(type);
+						s_propertyBags[type] = properties;
+						firstTimeInit = true;
+					}
+				}
+			}
+			result = properties;
+			return firstTimeInit;
+		}
+
+		private static ConfigurationPropertyCollection CreatePropertyBagFromType(Type type) {
+			Debug.Assert(type != null, "type != null");
+
+			// For ConfigurationElement derived classes - get the per-type validator
+			if (typeof(ConfigurationElement).IsAssignableFrom(type)) {
+				ConfigurationValidatorAttribute attribValidator = Attribute.GetCustomAttribute(type, typeof(ConfigurationValidatorAttribute)) as ConfigurationValidatorAttribute;
+
+				if (attribValidator != null) {
+					attribValidator.SetDeclaringType(type);
+					ConfigurationValidatorBase validator = attribValidator.ValidatorInstance;
+
+					if (validator != null) {
+						CachePerTypeValidator(type, validator);
+					}
+				}
+			}
+
+			ConfigurationPropertyCollection properties = new ConfigurationPropertyCollection();
+
+			foreach (PropertyInfo propertyInformation in type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)) {
+				ConfigurationProperty newProp = CreateConfigurationPropertyFromAttributes(propertyInformation);
+
+				if (newProp != null) {
+					properties.Add(newProp);
+				}
+			}
+
+			return properties;
+		}
+
+		private static ConfigurationProperty CreateConfigurationPropertyFromAttributes(PropertyInfo propertyInformation) {
+			ConfigurationProperty result = null;
+
+			ConfigurationPropertyAttribute attribProperty =
+				Attribute.GetCustomAttribute(propertyInformation,
+												typeof(ConfigurationPropertyAttribute)) as ConfigurationPropertyAttribute;
+
+			// If there is no ConfigurationProperty attrib - this is not considered a property
+			if (attribProperty != null) {
+				result = new ConfigurationProperty(propertyInformation);
+			}
+
+			// Handle some special cases of property types
+			if (result != null && typeof(ConfigurationElement).IsAssignableFrom(result.Type)) {
+				ConfigurationPropertyCollection unused = null;
+
+				PropertiesFromType(result.Type, out unused);
+			}
+
+			return result;
+		}
+
+		private static void CachePerTypeValidator( Type type, ConfigurationValidatorBase validator ) {
+			Debug.Assert((type != null) && ( validator != null));
+			Debug.Assert(typeof(ConfigurationElement).IsAssignableFrom(type));
+
+			// Use the same lock as the property bag lock since in the current implementation
+			// the only way to get to this method is through the code path that locks the property bag cache first ( see PropertiesFromType() )
+
+			// NOTE[ Thread Safety ]: Non-guarded access to static variable - since this code is called only from CreatePropertyBagFromType
+			// which in turn is done onle once per type and is guarded by the s_propertyBag.SyncRoot then this call is thread safe as well
+			if (s_perTypeValidators == null ) {
+					s_perTypeValidators = new Dictionary<Type,ConfigurationValidatorBase>();
+			}
+
+			// A type validator should be cached only once. If it isn't then attribute parsing is done more then once which should be avoided
+			Debug.Assert( !s_perTypeValidators.ContainsKey(type));
+
+			// Make sure the supplied validator supports validating this object
+			if (!validator.CanValidate(type)) {
+				throw new ConfigurationErrorsException("Validator does not support element type");
+			}
+
+			s_perTypeValidators.Add(type, validator);
+		}
+
+		private static void ApplyValidatorsRecursive(ConfigurationElement root) {
+			Debug.Assert(root != null);
+
+			// Apply the validator on 'root'
+			ApplyValidator(root);
+
+			// Apply validators on child elements ( note - we will do this only on already created child elements
+			// The non created ones will get their validators in the ctor
+			/* FIXME: Uncomment when we move over to the ConfigurationValues system. */
+/*
+			foreach (ConfigurationElement elem in root._values.ConfigurationElements) {
+				ApplyValidatorsRecursive(elem);
+			}
+*/
+		}
+
+		private static void ApplyValidator(ConfigurationElement elem) {
+			Debug.Assert(elem != null);
+
+			if ((s_perTypeValidators != null) && (s_perTypeValidators.ContainsKey(elem.GetType()))) {
+				elem._elementProperty = new ConfigurationElementProperty(s_perTypeValidators[ elem.GetType() ]);
+			}
+		}
+
+		protected internal virtual ConfigurationPropertyCollection Properties {
+			get {
+				ConfigurationPropertyCollection result = null;
+
+				if (PropertiesFromType(this.GetType(), out result))
+					ApplyValidatorsRecursive(this);
+				return result;
+			}
+		}
 		/* End of referencesource code. */
 
 		internal Configuration Configuration {
@@ -242,14 +375,6 @@ namespace System.Configuration
 
 				pi.Value = value;
 				modified = true;
-			}
-		}
-
-		protected internal virtual ConfigurationPropertyCollection Properties {
-			get {
-				if (map == null)
-					map = ElementMap.GetMap (GetType());
-				return map.Properties;
 			}
 		}
 
@@ -767,57 +892,6 @@ namespace System.Configuration
 				if (Mode == ConfigurationSaveMode.Full)
 					return true;
 				return Element.HasValue (Parent, prop, Mode);
-			}
-		}
-	}
-	
-	internal class ElementMap
-	{
-		static readonly Hashtable elementMaps = Hashtable.Synchronized (new Hashtable ());
-
-		readonly ConfigurationPropertyCollection properties;
-		readonly ConfigurationCollectionAttribute collectionAttribute;
-
-		public static ElementMap GetMap (Type t)
-		{
-			ElementMap map = elementMaps [t] as ElementMap;
-			if (map != null) return map;
-			map = new ElementMap (t);
-			elementMaps [t] = map;
-			return map;
-		}
-		
-		public ElementMap (Type t)
-		{
-			properties = new ConfigurationPropertyCollection ();
-		
-			collectionAttribute = Attribute.GetCustomAttribute (t, typeof(ConfigurationCollectionAttribute)) as ConfigurationCollectionAttribute;
-			
-			PropertyInfo[] props = t.GetProperties (BindingFlags.Public|BindingFlags.NonPublic|BindingFlags.Static|BindingFlags.Instance);
-			foreach (PropertyInfo prop in props)
-			{
-				ConfigurationPropertyAttribute at = Attribute.GetCustomAttribute (prop, typeof(ConfigurationPropertyAttribute)) as ConfigurationPropertyAttribute;
-				if (at == null) continue;
-
-				ConfigurationProperty cp = new ConfigurationProperty (prop);
-				properties.Add (cp);
-			}
-		}
-
-		public ConfigurationCollectionAttribute CollectionAttribute
-		{
-			get { return collectionAttribute; }
-		}
-		
-		public bool HasProperties
-		{
-			get { return properties.Count > 0; }
-		}
-		
-		public ConfigurationPropertyCollection Properties
-		{
-			get {
-				return properties;
 			}
 		}
 	}
