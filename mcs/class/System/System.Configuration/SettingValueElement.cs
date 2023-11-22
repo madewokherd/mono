@@ -110,7 +110,7 @@ namespace System.Configuration
 		{
 			if (node == null)
 				return false;
-			node.WriteTo (writer);
+			if (writer != null) node.WriteTo (writer);
 			return true;
 		}
 #endif

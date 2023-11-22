@@ -467,7 +467,7 @@ namespace System.Configuration
 				return base.SerializeElement (writer, serializeCollectionKey);
 			}
 			
-			bool wroteData = false;
+			bool wroteData = DataToWriteInternal;
 			
 			if (IsBasic)
 			{
@@ -482,15 +482,15 @@ namespace System.Configuration
 			else
 			{
 				if (emitClear) {
-					writer.WriteElementString (clearElementName, "");
+					if (writer != null) writer.WriteElementString (clearElementName, "");
 					wroteData = true;
 				}
 				
 				if (removed != null) {
 					for (int n=0; n<removed.Count; n++) {
-						writer.WriteStartElement (removeElementName);
+						if (writer != null) writer.WriteStartElement (removeElementName);
 						((ConfigurationElement)removed[n]).SerializeElement (writer, true);
-						writer.WriteEndElement ();
+						if (writer != null) writer.WriteEndElement ();
 					}
 					wroteData = wroteData || removed.Count > 0;
 				}
