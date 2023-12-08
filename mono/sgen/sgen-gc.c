@@ -197,6 +197,8 @@
 #include <mono/utils/mono-mmap-internals.h>
 #include <mono/utils/unlocked.h>
 
+#include <mono/utils/ftrace.h>
+
 #undef pthread_create
 #undef pthread_join
 #undef pthread_detach
@@ -2616,7 +2618,10 @@ sgen_ensure_free_space (size_t size, int generation)
 
 	if (generation_to_collect == -1)
 		return;
+
+	FTRACE_BLOCK_START("GC %s", reason)
 	sgen_perform_collection (size, generation_to_collect, reason, forced, TRUE);
+	FTRACE_BLOCK_END()
 }
 
 /*

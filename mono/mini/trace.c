@@ -26,6 +26,7 @@
 #include <mono/utils/mono-memory-model.h>
 #include "trace.h"
 #include <mono/metadata/callspec.h>
+#include <mono/utils/ftrace.h>
 
 #if _MSC_VER
 #pragma warning(disable:4312) // FIXME pointer cast to different size
@@ -167,6 +168,7 @@ mono_trace_enter_method (MonoMethod *method, MonoJitInfo *ji, MonoProfilerCallCo
 	if (!ji)
 		ji = mini_jit_info_table_find (mono_domain_get (), (char *)MONO_RETURN_ADDRESS (), NULL);
 
+	FTRACE("ENTER:%c %s", frame_kind (ji), fname);
 	printf ("ENTER:%c %s(", frame_kind (ji), fname);
 	g_free (fname);
 
@@ -354,6 +356,7 @@ mono_trace_leave_method (MonoMethod *method, MonoJitInfo *ji, MonoProfilerCallCo
 	if (!ji)
 		ji = mini_jit_info_table_find (mono_domain_get (), (char *)MONO_RETURN_ADDRESS (), NULL);
 
+	FTRACE("LEAVE:%c %s", frame_kind (ji), fname);
 	printf ("LEAVE:%c %s(", frame_kind (ji), fname);
 	g_free (fname);
 

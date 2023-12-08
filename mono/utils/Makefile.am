@@ -238,7 +238,9 @@ monoutils_sources = \
 	options.h \
 	options-def.h \
 	options.c \
-	ftnptr.h
+	ftnptr.h \
+	ftrace.c \
+	ftrace.h
 
 arch_sources = 
 
