@@ -92,7 +92,7 @@ namespace System.Web.Configuration
 			compressionEnabledProp = new ConfigurationProperty ("compressionEnabled", typeof (bool), false);
 			sqlConnectionRetryIntervalProp = new ConfigurationProperty ("sqlConnectionRetryIntervalProp", typeof (TimeSpan), TimeSpan.FromSeconds (0),
 										    PropertyHelper.TimeSpanSecondsOrInfiniteConverter,
-										    PropertyHelper.PositiveTimeSpanValidator,
+										    null,
 										    ConfigurationPropertyOptions.None);
 			properties = new ConfigurationPropertyCollection ();
 
