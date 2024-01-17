@@ -23,7 +23,9 @@ namespace System.Configuration
     {
         private ConfigurationElement           _thisElement;
         private PropertyInformationCollection  _internalProperties;
+	/* FIXME:MONO:Configuration-Errors: Mono doesn't implement ConfigurationElement errors.
         private ConfigurationException[]       _errors;
+	*/
 
         internal ElementInformation(ConfigurationElement thisElement) {
             _thisElement = thisElement;
@@ -61,8 +63,11 @@ namespace System.Configuration
         //
         public bool IsLocked {
             get {
+		/* FIXME:MONO:Configuration-Lock: Mono's ConfigurationElement doesn't implement locking.
                 return (((_thisElement.ItemLocked & ConfigurationValueFlags.Locked) != 0) &&
                         ((_thisElement.ItemLocked & ConfigurationValueFlags.Inherited) != 0));
+		*/
+		return false;
             }
         }
 
@@ -152,6 +157,7 @@ namespace System.Configuration
         // Get a Read Only list of the exceptions for this 
         // element
         //
+	/* FIXME:MONO:Configuration-Errors: Mono doesn't implement ConfigurationElement errors.
         private ConfigurationException[] GetReadOnlyErrorsList() {
             ArrayList                arrayList;
             int                      count;
@@ -169,18 +175,22 @@ namespace System.Configuration
 
             return exceptionList;
         }
-        
+        */
+
         // Errors
         //
         // Retrieve the _errors for this element and sub elements
         //
         public ICollection Errors {
             get {
+		/* FIXME:MONO:Configuration-Errors: Mono doesn't implement ConfigurationElement errors.
                 if (_errors == null) {
                     _errors = GetReadOnlyErrorsList();
                 }
 
                 return _errors;
+		*/
+		return null;
             }
         }
     }

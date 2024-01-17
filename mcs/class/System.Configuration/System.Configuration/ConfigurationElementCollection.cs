@@ -63,21 +63,6 @@ namespace System.Configuration
 			this.comparer = comparer;
 		}
 
-		internal override void InitFromProperty (PropertyInformation propertyInfo)
-		{
-			ConfigurationCollectionAttribute colat = propertyInfo.Property.CollectionAttribute;
-	
-			if (colat == null)
-				colat = Attribute.GetCustomAttribute (propertyInfo.Type, typeof (ConfigurationCollectionAttribute)) as ConfigurationCollectionAttribute;
-
-			if (colat != null) {
-				addElementName = colat.AddItemName;
-				clearElementName = colat.ClearItemsName;
-				removeElementName = colat.RemoveItemName;
-			}
-			base.InitFromProperty (propertyInfo);
-		}
-		
 		#endregion // Constructors
 
 		#region Properties
@@ -319,6 +304,7 @@ namespace System.Configuration
 			else
 				elem = CreateNewElement (elementName);
 			elem.Init ();
+			elem.AssociateContext(this.Configuration);
 			return elem;
 		}
 		

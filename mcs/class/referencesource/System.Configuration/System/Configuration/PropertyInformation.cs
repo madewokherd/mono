@@ -23,8 +23,23 @@ namespace System.Configuration {
         private string PropertyName;
         private ConfigurationProperty _Prop = null;
         private const string LockAll = "*";
-        
-        private ConfigurationProperty Prop {
+
+	/* Start of Mono compatibility code. */
+	internal ConfigurationProperty Property {
+		get { return Prop; }
+	}
+
+        internal bool IsElement {
+            get { return Prop.IsElement; }
+        }
+
+        internal string GetStringValue ()
+        {
+            return Prop.ConvertToString(Value);
+        }
+	/* End of Mono compatibility code. */
+
+	private ConfigurationProperty Prop {
             get {
                 if (_Prop == null) {
                     _Prop = ThisElement.Properties[PropertyName];
@@ -129,12 +144,15 @@ namespace System.Configuration {
         //
         public bool IsLocked {
             get {
-                return ((ThisElement.LockedAllExceptAttributesList != null && !ThisElement.LockedAllExceptAttributesList.DefinedInParent(PropertyName)) ||
+		/* FIXME:MONO:Configuration-Lock: Mono's ConfigurationElement doesn't implement locking.
+		return ((ThisElement.LockedAllExceptAttributesList != null && !ThisElement.LockedAllExceptAttributesList.DefinedInParent(PropertyName)) ||
                     (ThisElement.LockedAttributesList != null && 
                         (ThisElement.LockedAttributesList.DefinedInParent(PropertyName) || 
                          ThisElement.LockedAttributesList.DefinedInParent(LockAll))) ||
                         (((ThisElement.ItemLocked & ConfigurationValueFlags.Locked)    != 0) &&
                          ((ThisElement.ItemLocked & ConfigurationValueFlags.Inherited) != 0)));
+		*/
+		return false;
             }
         }
 

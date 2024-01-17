@@ -61,6 +61,9 @@ System.Configuration/ConfigurationSectionGroupCollection.cs
 System.Configuration/ConfigurationUserLevel.cs
 ../referencesource/System.Configuration/System/Configuration/ConfigurationValidatorAttribute.cs
 System.Configuration/ConfigurationValidatorBase.cs
+../referencesource/System.Configuration/System/Configuration/ConfigurationValue.cs
+../referencesource/System.Configuration/System/Configuration/ConfigurationValueFlags.cs
+../referencesource/System.Configuration/System/Configuration/ConfigurationValues.cs
 System.Configuration/ConfigXmlTextReader.cs
 System.Configuration/ConnectionStringsSection.cs
 System.Configuration/ConnectionStringSettingsCollection.cs
@@ -69,7 +72,7 @@ System.Configuration/ContextInformation.cs
 System.Configuration/DefaultSection.cs
 System.Configuration/DefaultValidator.cs
 System.Configuration/DpapiProtectedConfigurationProvider.cs
-System.Configuration/ElementInformation.cs
+../referencesource/System.Configuration/System/Configuration/elementinformation.cs
 System.Configuration/ExeConfigurationFileMap.cs
 System.Configuration/ExeContext.cs
 System.Configuration/GenericEnumConverter.cs
@@ -82,6 +85,7 @@ System.Configuration/IntegerValidatorAttribute.cs
 System.Configuration/InternalConfigurationFactory.cs
 System.Configuration/InternalConfigurationHost.cs
 System.Configuration/InternalConfigurationRoot.cs
+../referencesource/System.Configuration/System/Configuration/InvalidPropValue.cs
 System.Configuration/KeyValueConfigurationCollection.cs
 System.Configuration/KeyValueInternalCollection.cs
 System.Configuration/KeyValueConfigurationElement.cs
@@ -91,8 +95,9 @@ System.Configuration/NameValueConfigurationCollection.cs
 System.Configuration/NameValueConfigurationElement.cs
 System.Configuration/PositiveTimeSpanValidator.cs
 System.Configuration/PositiveTimeSpanValidatorAttribute.cs
-System.Configuration/PropertyInformation.cs
-System.Configuration/PropertyInformationCollection.cs
+../referencesource/System.Configuration/System/Configuration/PropertyInformation.cs
+../referencesource/System.Configuration/System/Configuration/PropertyInformationCollection.cs
+../referencesource/System.Configuration/System/Configuration/PropertySourceInfo.cs
 System.Configuration/PropertyValueOrigin.cs
 System.Configuration/ProtectedConfiguration.cs
 System.Configuration/ProtectedConfigurationProvider.cs

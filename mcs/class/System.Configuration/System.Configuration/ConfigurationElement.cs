@@ -46,9 +46,7 @@ namespace System.Configuration
 		ConfigurationElementCollection defaultCollection;
 		bool readOnly;
 		ElementInformation elementInfo;
-		ConfigurationElementProperty elementProperty;
-		Configuration _configuration;
-		bool elementPresent;
+		internal Configuration _configRecord;
 
 		/* Start of referencesource code. */
 		internal static readonly Object s_nullPropertyValue = new Object();
@@ -58,6 +56,11 @@ namespace System.Configuration
 		private static volatile Dictionary<Type,ConfigurationValidatorBase> s_perTypeValidators;
 		private ConfigurationElementProperty	_elementProperty = s_ElementProperty;
 		private bool _bDataToWrite;
+		private readonly ConfigurationValues _values;
+		private bool   _bInited;
+		private bool   _bElementPresent;
+		private string _elementTagName;
+		internal const string DefaultCollectionPropertyName = "";
 
 		private static bool PropertiesFromType(Type type, out ConfigurationPropertyCollection result) {
 			ConfigurationPropertyCollection properties = (ConfigurationPropertyCollection)s_propertyBags[type];
@@ -161,12 +164,9 @@ namespace System.Configuration
 
 			// Apply validators on child elements ( note - we will do this only on already created child elements
 			// The non created ones will get their validators in the ctor
-			/* FIXME: Uncomment when we move over to the ConfigurationValues system. */
-/*
 			foreach (ConfigurationElement elem in root._values.ConfigurationElements) {
 				ApplyValidatorsRecursive(elem);
 			}
-*/
 		}
 
 		private static void ApplyValidator(ConfigurationElement elem) {
@@ -195,27 +195,373 @@ namespace System.Configuration
 				_bDataToWrite = value;
 			}
 		}
+
+		internal ConfigurationElement CreateElement(Type type) {
+                        // We use this.GetType() as the calling type since all code paths which lead to
+                        // CreateElement are protected methods, so inputs are provided by somebody in
+                        // the current type hierarchy. Since we expect that the most subclassed type
+                        // will be the most restricted security-wise, we'll use it as the calling type.
+
+                        ConfigurationElement element = (ConfigurationElement)TypeUtil.CreateInstanceRestricted(callingType: GetType(), targetType: type);
+                        element.CallInit();
+                        return element;
+                }
+
+		protected ConfigurationElement () {
+                        _values = new ConfigurationValues();
+
+                        // Set the per-type validator ( this will actually have an effect only for an attributed model elements )
+                        // Note that in the case where the property bag fot this.GetType() has not yet been created
+                        // the validator for this instance will get applied in ApplyValidatorsRecursive ( see this.get_Properties )
+                        ApplyValidator(this);
+		}
+
+		// Give elements that are added to a collection an opportunity to
+		//
+		protected internal virtual void Init() {
+			// If Init is called by the derived class, we may be able
+			// to set _bInited to true if the derived class properly
+			// calls Init on its base.
+			_bInited = true;
+		}
+
+		internal void CallInit() {
+			// Ensure Init is called just once
+			if (!_bInited) {
+				Init();
+				_bInited = true;
+			}
+		}
+		protected void SetPropertyValue(ConfigurationProperty prop, object value, bool ignoreLocks) {
+			if (IsReadOnly()) {
+				throw new ConfigurationErrorsException(SR.GetString(SR.Config_base_read_only));
+			}
+
+			/* FIXME:MONO:Configuration-Lock: Mono's ConfigurationElement doesn't implement locking.
+			if ((ignoreLocks == false) &&
+				((_lockedAllExceptAttributesList != null && _lockedAllExceptAttributesList.HasParentElements && !_lockedAllExceptAttributesList.DefinedInParent(prop.Name)) ||
+					(_lockedAttributesList != null && (_lockedAttributesList.DefinedInParent(prop.Name) || _lockedAttributesList.DefinedInParent(LockAll))) ||
+					((_fItemLocked & ConfigurationValueFlags.Locked) != 0) &&
+					(_fItemLocked & ConfigurationValueFlags.Inherited) != 0)) {
+				throw new ConfigurationErrorsException(SR.GetString(SR.Config_base_attribute_locked, prop.Name));
+			}
+			*/
+//			_bModified = true;
+			modified = true;
+
+			// Run the new value through the validator to make sure its ok to store it
+			if (value != null) {
+				prop.Validate(value);
+			}
+
+			_values[prop.Name] = (value != null) ? value : s_nullPropertyValue;
+		}
+
+		internal protected virtual ConfigurationElementProperty ElementProperty {
+			get {
+				return _elementProperty;
+			}
+		}
+
+		protected internal Object this[ConfigurationProperty prop] {
+			get {
+				Object o = _values[prop.Name];
+				if (o == null) {
+					if (prop.IsConfigurationElementType) {
+						lock (_values.SyncRoot) {
+							o = _values[prop.Name];
+							if (o == null) {
+								ConfigurationElement childElement = CreateElement(prop.Type);
+
+//								if (_bReadOnly) {
+								if (readOnly) {
+									childElement.SetReadOnly();
+								}
+
+								if (typeof(ConfigurationElementCollection).IsAssignableFrom(prop.Type)) {
+									ConfigurationElementCollection childElementCollection = childElement as ConfigurationElementCollection;
+									if (prop.AddElementName != null)
+										childElementCollection.AddElementName = prop.AddElementName;
+									if (prop.RemoveElementName != null)
+										childElementCollection.RemoveElementName = prop.RemoveElementName;
+									if (prop.ClearElementName != null)
+										childElementCollection.ClearElementName = prop.ClearElementName;
+								}
+
+								//_values[prop.Name] = childElement;
+								_values.SetValue(prop.Name, childElement, ConfigurationValueFlags.Inherited, null);
+								o = childElement;
+							}
+						}
+					}
+					else {
+						o = prop.DefaultValue;
+					}
+				}
+				else if (o == s_nullPropertyValue) {
+					o = null;
+				}
+
+				// If its an invalid value - throw the error now
+				if (o is InvalidPropValue) {
+					throw ((InvalidPropValue)o).Error;
+				}
+
+				return o;
+			}
+
+			set {
+				SetPropertyValue(prop, value,false); // Do not ignore locks!!!
+			}
+		}
+
+		protected internal Object this[String propertyName] {
+			get {
+				ConfigurationProperty prop = Properties[propertyName];
+				if (prop == null) {
+					prop = Properties[DefaultCollectionPropertyName];
+					if (prop.ProvidedName != propertyName) {
+						return null;
+					}
+				}
+				return this[prop];
+			}
+			set {
+				Debug.Assert(Properties.Contains(propertyName), "Properties.Contains(propertyName)");
+				SetPropertyValue(Properties[propertyName], value, false);// Do not ignore locks!!!
+			}
+		}
+
+		internal ConfigurationValues Values {
+				get {
+					return _values;
+				}
+		}
+
+		internal PropertySourceInfo PropertyInfoInternal(string propertyName) {
+				return (PropertySourceInfo)_values.GetSourceInfo(propertyName);
+		}
+
+		internal string PropertyFileName(string propertyName) {
+				PropertySourceInfo p = (PropertySourceInfo)PropertyInfoInternal(propertyName);
+				if (p == null)
+					p = (PropertySourceInfo)PropertyInfoInternal(String.Empty); // Get the filename of the parent if prop is not there
+				if (p == null)
+					return String.Empty;
+				return p.FileName;
+		}
+
+		internal int PropertyLineNumber(string propertyName) {
+				PropertySourceInfo p = (PropertySourceInfo)PropertyInfoInternal(propertyName);
+				if (p == null)
+					p = (PropertySourceInfo)PropertyInfoInternal(String.Empty);
+				if (p == null)
+					return 0;
+				return p.LineNumber;
+		}
+
+		private object DeserializePropertyValue(ConfigurationProperty prop, XmlReader reader) {
+			Debug.Assert(prop != null, "prop != null");
+			Debug.Assert(reader != null, "reader != null");
+
+			// By default we try to load (i.e. parse/validate ) all properties
+			// If a property value is invalid ( cannot be parsed or is not valid ) we will keep the value
+			// as string ( from the xml ) and will write it out unchanged if needed
+			// If the property value is needed by users the actuall exception will be thrown
+
+			string xmlValue = reader.Value;
+			object propertyValue = null;
+
+			try {
+				propertyValue = prop.ConvertFromString(xmlValue);
+
+				// Validate the loaded and converted value
+				prop.Validate(propertyValue);
+			}
+			catch (ConfigurationException ce) {
+				// If the error is incomplete - complete it :)
+				if (string.IsNullOrEmpty(ce.Filename)) {
+					ce = new ConfigurationErrorsException(ce.Message, reader);
+				}
+
+				// Cannot parse/validate the value. Keep it as string
+				propertyValue = new InvalidPropValue(xmlValue, ce);
+			}
+			catch {
+				// If this is an exception related to the parsing/validating the
+				// value ConfigurationErrorsException should be thrown instead.
+				// If not - the exception is ok to surface out of here
+				Debug.Fail("Unknown exception type thrown");
+			}
+
+			return propertyValue;
+		}
+
+		protected internal virtual bool IsModified() {
+
+//			if (_bModified) {
+			if (modified) {
+				return true;
+			}
+
+			/* FIXME:MONO:Configuration-Lock: Mono's ConfigurationElement doesn't implement locking.
+			if (_lockedAttributesList != null && _lockedAttributesList.IsModified) {
+				return true;
+			}
+
+			if (_lockedAllExceptAttributesList != null && _lockedAllExceptAttributesList.IsModified) {
+				return true;
+			}
+
+			if (_lockedElementsList != null && _lockedElementsList.IsModified) {
+				return true;
+			}
+
+			if (_lockedAllExceptElementsList != null && _lockedAllExceptElementsList.IsModified) {
+				return true;
+			}
+
+			if ((_fItemLocked & ConfigurationValueFlags.Modified) != 0) {
+				return true;
+			}
+			*/
+			foreach (ConfigurationElement elem in _values.ConfigurationElements) {
+				if (elem.IsModified()) {
+					return true;
+				}
+			}
+			return false;
+		}
+
+		protected internal virtual void ResetModified() {
+//			_bModified = false;
+			modified = false;
+
+			/* FIXME:MONO:Configuration-Lock: Mono's ConfigurationElement doesn't implement locking.
+			if (_lockedAttributesList != null) {
+				_lockedAttributesList.ResetModified();
+			}
+
+			if (_lockedAllExceptAttributesList != null) {
+				_lockedAllExceptAttributesList.ResetModified();
+			}
+
+			if (_lockedElementsList != null) {
+				_lockedElementsList.ResetModified();
+			}
+
+			if (_lockedAllExceptElementsList != null) {
+				_lockedAllExceptElementsList.ResetModified();
+			}
+			*/
+
+			foreach (ConfigurationElement elem in _values.ConfigurationElements) {
+				elem.ResetModified();
+			}
+		}
+
+		protected internal virtual void Reset(ConfigurationElement parentElement) {
+			Values.Clear();
+//			ResetLockLists(parentElement); FIXME:MONO:Configuration-Lock: Mono's ConfigurationElement doesn't implement locking.
+			ConfigurationPropertyCollection props = Properties; // Force the bag to be up to date
+			_bElementPresent = false;
+			if (parentElement == null) {
+				InitializeDefault();
+			}
+			else {
+				bool hasAnyChildElements = false;
+
+				ConfigurationPropertyCollection collectionKeys = null;
+
+				for (int index = 0; index < parentElement.Values.Count; index++) {
+					string key = parentElement.Values.GetKey(index);
+					ConfigurationValue ConfigValue = parentElement.Values.GetConfigValue(index);
+					object value = (ConfigValue != null) ? ConfigValue.Value : null;
+					PropertySourceInfo sourceInfo = (ConfigValue != null) ? ConfigValue.SourceInfo : null;
+
+					ConfigurationProperty prop = (ConfigurationProperty)parentElement.Properties[key];
+					if (prop == null || ((collectionKeys != null) && !collectionKeys.Contains(prop.Name))) {
+						continue;
+					}
+
+					if (prop.IsConfigurationElementType) {
+						hasAnyChildElements = true;
+					}
+					else {
+						/* FIXME:MONO:Configuration-Lock: Mono's ConfigurationElement doesn't implement locking.
+						ConfigurationValueFlags flags = ConfigurationValueFlags.Inherited |
+							(((_lockedAttributesList != null) &&
+							  (_lockedAttributesList.Contains(key) ||
+							   _lockedAttributesList.Contains(LockAll)) ||
+							  (_lockedAllExceptAttributesList != null) &&
+							  !_lockedAllExceptAttributesList.Contains(key)) ?
+							  ConfigurationValueFlags.Locked : ConfigurationValueFlags.Default);
+						*/
+						ConfigurationValueFlags flags = ConfigurationValueFlags.Inherited | ConfigurationValueFlags.Default;
+
+						if (value != s_nullPropertyValue) {
+							// _values[key] = value;
+							_values.SetValue(key, value, flags, sourceInfo);
+						}
+						if (!props.Contains(key)) // this is for optional provider models keys
+						{
+							props.Add(prop);
+							_values.SetValue(key, value, flags, sourceInfo);
+						}
+					}
+				}
+
+				if (hasAnyChildElements) {
+					for (int index = 0; index < parentElement.Values.Count; index++) {
+						string key = parentElement.Values.GetKey(index);
+						object value = parentElement.Values[index];
+
+						ConfigurationProperty prop = (ConfigurationProperty)parentElement.Properties[key];
+						if ((prop != null) && prop.IsConfigurationElementType) {
+							//((ConfigurationElement)value).SerializeToXmlElement(writer, prop.Name);
+							ConfigurationElement childElement = (ConfigurationElement)this[prop];
+							childElement.Reset((ConfigurationElement)value);
+						}
+					}
+				}
+			}
+		}
+
+		internal bool ElementPresent {
+			get {
+				return _bElementPresent;
+			}
+			set {
+				_bElementPresent = value;
+			}
+		}
+
+		internal string ElementTagName {
+			get {
+				return _elementTagName;
+			}
+		}
+		// AssociateContext
+		//
+		// Associate a context with this element
+		//
+//		internal virtual void AssociateContext(BaseConfigurationRecord configRecord) {
+		/* referencesource uses a BaseConfigurationRecord to store context, Mono uses Configuration. */
+		internal virtual void AssociateContext(Configuration config) {
+			Configuration = config;
+			Values.AssociateContext(config);
+		}
 		/* End of referencesource code. */
 
 		internal Configuration Configuration {
-			get { return _configuration; }
-			set { _configuration = value; }
+			get { return _configRecord; }
+			set { _configRecord = value; }
 		}
 
-		protected ConfigurationElement ()
-		{
-		}
-		
-		internal virtual void InitFromProperty (PropertyInformation propertyInfo)
-		{
-			elementInfo = new ElementInformation (this, propertyInfo);
-			Init ();
-		}
-		
 		public ElementInformation ElementInformation {
 			get {
 				if (elementInfo == null)
-					elementInfo = new ElementInformation (this, null);
+					elementInfo = new ElementInformation (this);
 				return elementInfo;
 			}
 		}
@@ -227,18 +573,6 @@ namespace System.Configuration
 				// some refactory on the entire assembly.
 				if (rawXml == null || value != null)
 					rawXml = value;
-			}
-		}
-
-		protected internal virtual void Init ()
-		{
-		}
-
-		protected internal virtual ConfigurationElementProperty ElementProperty {
-			get {
-				if (elementProperty == null)
-					elementProperty = new ConfigurationElementProperty (ElementInformation.Validator);
-				return elementProperty;
 			}
 		}
 
@@ -307,28 +641,6 @@ namespace System.Configuration
 			throw new NotImplementedException ();
 		}
 
-		[MonoTODO]
-		protected void SetPropertyValue (ConfigurationProperty prop, object value, bool ignoreLocks)
-		{
-			try {
-				if (value != null) {
-					/* XXX all i know for certain is that Validation happens here */
-					prop.Validate (value);
-
-					/* XXX presumably the actual setting of the
-					 * property happens here instead of in the
-					 * set_Item code below, but that would mean
-					 * the Value needs to be stuffed in the
-					 * property, not the propertyinfo (or else the
-					 * property needs a ref to the property info
-					 * to correctly set the value). */
-				}
-			}
-			catch (Exception e) {
-				throw new ConfigurationErrorsException (String.Format ("The value for the property '{0}' on type {1} is not valid.", prop.Name, this.ElementInformation.Type), e);
-			}
-		}
-
 		internal ConfigurationPropertyCollection GetKeyProperties ()
 		{
 			if (keyProps != null) return keyProps;
@@ -360,32 +672,6 @@ namespace System.Configuration
 			}
 
 			return defaultCollection;
-		}
-
-		protected internal object this [ConfigurationProperty prop] {
-			get { return this [prop.Name]; }
-			set { this [prop.Name] = value; }
-		}
-
-		protected internal object this [string propertyName] {
-			get {
-				PropertyInformation pi = ElementInformation.Properties [propertyName];
-				if (pi == null)
-					throw new InvalidOperationException ("Property '" + propertyName + "' not found in configuration element");
-
-				return pi.Value;
-			}
-
-			set {
-				PropertyInformation pi = ElementInformation.Properties [propertyName];
-				if (pi == null)
-					throw new InvalidOperationException ("Property '" + propertyName + "' not found in configuration element");
-
-				SetPropertyValue (pi.Property, value, false);
-
-				pi.Value = value;
-				modified = true;
-			}
 		}
 
 		public override bool Equals (object compareTo)
@@ -431,8 +717,16 @@ namespace System.Configuration
 			Hashtable readProps = new Hashtable ();
 			
 			reader.MoveToContent ();
-			elementPresent = true;
-			
+
+			ConfigXmlTextReader _reader = reader as ConfigXmlTextReader;
+			if (_reader != null) {
+				PropertySourceInfo rootInfo = new PropertySourceInfo(_reader);
+				_elementTagName = _reader.Name;
+				_values.SetValue(_reader.Name, null, ConfigurationValueFlags.Modified, rootInfo);
+				_values.SetValue(DefaultCollectionPropertyName, defaultCollection, ConfigurationValueFlags.Modified, rootInfo);
+				_bElementPresent = true;
+			}
+
 			while (reader.MoveToNextAttribute ())
 			{
 				PropertyInformation prop = ElementInformation.Properties [reader.LocalName];
@@ -466,26 +760,11 @@ namespace System.Configuration
 				if (readProps.ContainsKey (prop))
 					throw new ConfigurationErrorsException ("The attribute '" + prop.Name + "' may only appear once in this element.", reader);
 
-				string value = null;
-				try {
-					value = reader.Value;
-					ValidateValue (prop.Property, value);
-					prop.SetStringValue (value);
-				} catch (ConfigurationErrorsException) {
-					throw;
-				} catch (ConfigurationException) {
-					throw;
-				} catch (Exception ex) {
-					string msg = String.Format ("The value for the property '{0}' is not valid. The error is: {1}", prop.Name, ex.Message);
-					throw new ConfigurationErrorsException (msg, reader);
-				}
+				_values.SetValue(prop.Name,
+						    DeserializePropertyValue(Properties[reader.Name], reader),
+						    ConfigurationValueFlags.Modified,
+						    new PropertySourceInfo(reader));
 				readProps [prop] = prop.Name;
-			
-				ConfigXmlTextReader _reader = reader as ConfigXmlTextReader;
-				if (_reader != null){
-					prop.Source = _reader.Filename;
-					prop.LineNumber = _reader.LineNumber;
-				}
 			}
 			
 			reader.MoveToElement ();
@@ -539,10 +818,8 @@ namespace System.Configuration
 					PropertyInformation p = ElementInformation.Properties [prop.Name];
 					if (p == null) {
 						object val = OnRequiredPropertyNotFound (prop.Name);
-						if (!object.Equals (val, prop.DefaultValue)) {
-							prop.Value = val;
-							prop.IsModified = false;
-						}
+						if (!object.Equals (val, prop.DefaultValue))
+							_values.SetValue(prop.Name, val, ConfigurationValueFlags.Default, null);
 					}
 				}
 
@@ -576,25 +853,6 @@ namespace System.Configuration
 		{
 		}
 
-		protected internal virtual bool IsModified ()
-		{
-			if (modified)
-				return true;
-
-			foreach (PropertyInformation prop in ElementInformation.Properties) {
-				if (!prop.IsElement)
-					continue;
-				var element = prop.Value as ConfigurationElement;
-				if ((element == null) || !element.IsModified ())
-					continue;
-
-				modified = true;
-				break;
-			}
-
-			return modified;
-		}
-		
 		protected internal virtual void SetReadOnly ()
 		{
 			readOnly = true;
@@ -603,29 +861,6 @@ namespace System.Configuration
 		public virtual bool IsReadOnly ()
 		{
 			return readOnly;
-		}
-
-		protected internal virtual void Reset (ConfigurationElement parentElement)
-		{
-			elementPresent = false;
-
-			if (parentElement != null)
-				ElementInformation.Reset (parentElement.ElementInformation);
-			else
-				InitializeDefault ();
-		}
-
-		protected internal virtual void ResetModified ()
-		{
-			modified = false;
-
-			foreach (PropertyInformation p in ElementInformation.Properties) {
-				p.IsModified = false;
-
-				var element = p.Value as ConfigurationElement;
-				if (element != null)
-					element.ResetModified ();
-			}
 		}
 
 		protected internal virtual bool SerializeElement (XmlWriter writer, bool serializeCollectionKey)
@@ -745,11 +980,6 @@ namespace System.Configuration
 			return info != null && info.ValueOrigin == PropertyValueOrigin.SetHere;
 		}
 
-		internal bool IsElementPresent
-		{
-			get {	return elementPresent;	}
-		}
-
 		void ValidateValue (ConfigurationProperty p, string value)
 		{
 			ConfigurationValidatorBase validator;
@@ -840,7 +1070,7 @@ namespace System.Configuration
 		{
 			if (mode == ConfigurationSaveMode.Full)
 				return true;
-			if (modified && (mode == ConfigurationSaveMode.Modified))
+			if (IsModified() && (mode == ConfigurationSaveMode.Modified))
 				return true;
 			
 			foreach (PropertyInformation prop in ElementInformation.Properties) {

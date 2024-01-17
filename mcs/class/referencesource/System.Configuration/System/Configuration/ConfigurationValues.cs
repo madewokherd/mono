@@ -21,7 +21,8 @@ using System.Text;
 namespace System.Configuration {
 
     internal class ConfigurationValues : NameObjectCollectionBase {
-        private BaseConfigurationRecord _configRecord;
+//        private BaseConfigurationRecord _configRecord;
+        private Configuration _configRecord; /* To maintain Mono compatibility, Mono stores context in Configuration. */
         private volatile bool _containsElement;
         private volatile bool _containsInvalidValue;
 
@@ -32,7 +33,8 @@ namespace System.Configuration {
         //
         // Associate a collection of values with a configRecord
         //
-        internal void AssociateContext(BaseConfigurationRecord configRecord) {
+//        internal void AssociateContext(BaseConfigurationRecord configRecord) {
+        internal void AssociateContext(Configuration configRecord) {
             _configRecord = configRecord;
 
             // Associate with children
