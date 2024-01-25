@@ -27,7 +27,11 @@ namespace System.Configuration {
     //
 
     [System.Diagnostics.DebuggerDisplay("ConfigPath = {ConfigPath}")]
+#if !MONO
     abstract internal class BaseConfigurationRecord : IInternalConfigRecord {
+#else
+    abstract internal class BaseConfigurationRecord {
+#endif
         protected const string NL                                               = "\r\n";
 
         internal    const string KEYWORD_TRUE                                   = "true";
@@ -121,7 +125,7 @@ namespace System.Configuration {
         internal const char             ConfigPathSeparatorChar = '/';
         internal const string           ConfigPathSeparatorString = "/";
         static internal readonly char[] ConfigPathSeparatorParams = new char[] {ConfigPathSeparatorChar};
-
+#if !MONO
         private static volatile ConfigurationPermission  s_unrestrictedConfigPermission; // cached ConfigurationPermission
 
         protected SafeBitVector32               _flags;                 // state
@@ -4341,7 +4345,7 @@ namespace System.Configuration {
                 }
             }
         }
-
+#endif
         // We reserve all attribute names starting with config or lock
         internal static bool IsReservedAttributeName(string name) {
             if (StringUtil.StartsWith(name, "config") ||
@@ -4352,7 +4356,7 @@ namespace System.Configuration {
                 return false;
             }
         }
-
+#if !MONO
         protected class ConfigRecordStreamInfo {
             private bool                    _hasStream;             // does the stream exist?
             private string                  _streamname;            // name of the stream of this record
@@ -4518,5 +4522,6 @@ namespace System.Configuration {
                 return (CurrentConfiguration == null) ? (new Stack()) : CurrentConfiguration.SectionsStack;
             }
         }
+#endif
     }
 }

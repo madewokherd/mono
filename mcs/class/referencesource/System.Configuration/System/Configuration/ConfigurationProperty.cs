@@ -32,6 +32,25 @@ namespace System.Configuration {
         private String _clearElementName = null;
         private volatile bool _isTypeInited;
         private volatile bool _isConfigurationElementType;
+	/* Start of Mono compatibility code. */
+	private ConfigurationCollectionAttribute collectionAttribute = null;
+
+	/*
+	 * IsElement was a method implemented by Mono's ConfigurationProperty class, it serves
+	 * the same purpose as referencesource's IsConfigurationElementType. Rather than modify
+	 * a ton of code in Mono, we'll just add this method to referencesource.
+	 */
+	internal bool IsElement {
+		get {
+			return IsConfigurationElementType;
+		}
+	}
+
+	/* Used from within Mono's ConfigurationElementCollection. */
+	internal ConfigurationCollectionAttribute CollectionAttribute {
+                get { return collectionAttribute; }
+        }
+	/* End of Mono compatibility code. */
 
         public ConfigurationProperty(String name, Type type) {
             object defaultValue = null;
@@ -138,6 +157,7 @@ namespace System.Configuration {
                                                         typeof(ConfigurationCollectionAttribute)) as ConfigurationCollectionAttribute;
                 }
                 if (attribCollection != null) {
+		    collectionAttribute = attribCollection; /* For Mono compatibility. */
                     if (attribCollection.AddItemName.IndexOf(',') == -1) {
                         _addElementName = attribCollection.AddItemName;
                     }
