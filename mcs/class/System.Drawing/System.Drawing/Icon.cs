@@ -126,8 +126,6 @@ namespace System.Drawing
 		private Icon (IntPtr handle)
 		{
 			this.handle = handle;
-			bitmap = Bitmap.FromHicon (handle);
-			iconSize = new Size (bitmap.Width, bitmap.Height);
 			if (GDIPlus.RunningOnUnix ()) {
 				bitmap = Bitmap.FromHicon (handle);
 				iconSize = new Size (bitmap.Width, bitmap.Height);
@@ -136,9 +134,8 @@ namespace System.Drawing
 				IconInfo ii;
 				GDIPlus.GetIconInfo (handle, out ii);
 
-				// If this structure defines an icon, the hot spot is always in the center of the icon
-				iconSize = new Size (ii.xHotspot * 2, ii.yHotspot * 2);
 				bitmap = (Bitmap) Image.FromHbitmap (ii.hbmColor);
+				iconSize = new Size (bitmap.Width, bitmap.Height);
 			}
 			undisposable = true;
 		}
