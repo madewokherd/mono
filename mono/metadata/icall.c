@@ -7299,10 +7299,13 @@ ves_icall_System_Environment_Exit (int result)
 	if (!mono_runtime_try_shutdown ())
 		mono_thread_exit ();
 
-	/* Suspend all managed threads since the runtime is going away */
-	mono_thread_suspend_all_other_threads ();
-
-	mono_runtime_quit_internal ();
+	/*
+	 * Suspend all managed threads since the runtime is going away and if
+	 * that succeeds tear down the runtime. Otherwise we are just going to
+	 * exit().
+	 */
+	if (mono_thread_suspend_all_other_threads ())
+		mono_runtime_quit_internal ();
 
 	/* we may need to do some cleanup here... */
 	exit (result);

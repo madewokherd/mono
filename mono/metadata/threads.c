@@ -3870,25 +3870,61 @@ mono_thread_manage_internal (void)
 }
 
 static void
-collect_threads_for_suspend (gpointer key, gpointer value, gpointer user_data)
+suspend_thread (gpointer key, gpointer value, gpointer user_data)
 {
 	MonoInternalThread *thread = (MonoInternalThread*)value;
-	struct wait_data *wait = (struct wait_data*)user_data;
+	MonoNativeThreadId self = mono_native_thread_id_get ();
 
-	/* 
-	 * We try to exclude threads early, to avoid running into the MONO_W32HANDLE_MAXIMUM_WAIT_OBJECTS
-	 * limitation.
-	 * This needs no locking.
-	 */
-	if ((thread->state & ThreadState_Suspended) != 0 || 
-		(thread->state & ThreadState_Stopped) != 0)
+	if (mono_native_thread_id_equals (thread_get_tid (thread), self)
+	     || mono_gc_is_finalizer_internal_thread (thread)
+	     || (thread->flags & MONO_THREAD_FLAG_DONT_MANAGE))
 		return;
 
-	if (wait->num<MONO_W32HANDLE_MAXIMUM_WAIT_OBJECTS) {
-		wait->handles [wait->num] = mono_threads_open_thread_handle (thread->handle);
-		wait->threads [wait->num] = thread;
-		wait->num++;
+	LOCK_THREAD (thread);
+	if (thread->state & (ThreadState_Suspended | ThreadState_Stopped)) {
+		UNLOCK_THREAD (thread);
+		return;
 	}
+
+	/* Convert abort requests into suspend requests */
+	if ((thread->state & ThreadState_AbortRequested) != 0)
+		thread->state &= ~ThreadState_AbortRequested;
+
+	thread->state |= ThreadState_SuspendRequested;
+	MONO_ENTER_GC_SAFE;
+	mono_os_event_reset (thread->suspended);
+	MONO_EXIT_GC_SAFE;
+
+	/* Signal the thread to suspend + calls UNLOCK_THREAD (thread) */
+	async_suspend_internal (thread, TRUE);
+}
+
+static void
+any_unsuspended_threads (gpointer key, gpointer value, gpointer user_data)
+{
+	MonoInternalThread *thread = (MonoInternalThread*)value;
+	MonoNativeThreadId self = mono_native_thread_id_get ();
+	gboolean *still_suspending = (gboolean*) user_data;
+
+	if (mono_native_thread_id_equals (thread_get_tid (thread), self)
+	     || mono_gc_is_finalizer_internal_thread (thread)
+	     || (thread->flags & MONO_THREAD_FLAG_DONT_MANAGE))
+		return;
+
+	LOCK_THREAD (thread);
+	if (!(thread->state & (ThreadState_Suspended | ThreadState_Stopped))) {
+		*still_suspending = TRUE;
+	}
+	UNLOCK_THREAD (thread);
+}
+
+static gboolean is_still_suspending (void)
+{
+	gboolean still_suspending = FALSE;
+	mono_threads_lock ();
+	mono_g_hash_table_foreach (threads, any_unsuspended_threads, &still_suspending);
+	mono_threads_unlock ();
+	return still_suspending;
 }
 
 /*
@@ -3897,21 +3933,10 @@ collect_threads_for_suspend (gpointer key, gpointer value, gpointer user_data)
  *  Suspend all managed threads except the finalizer thread and this thread. It is
  * not possible to resume them later.
  */
-void mono_thread_suspend_all_other_threads (void)
+gboolean mono_thread_suspend_all_other_threads (void)
 {
-	struct wait_data wait_data;
-	struct wait_data *wait = &wait_data;
-	int i;
-	MonoNativeThreadId self = mono_native_thread_id_get ();
-	guint32 eventidx = 0;
-	gboolean starting, finished;
-
-	memset (wait, 0, sizeof (struct wait_data));
-	/*
-	 * The other threads could be in an arbitrary state at this point, i.e.
-	 * they could be starting up, shutting down etc. This means that there could be
-	 * threads which are not even in the threads hash table yet.
-	 */
+	gint64 start_time;
+	gint64 timeout = 1000;
 
 	/* 
 	 * First we set a barrier which will be checked by all threads before they
@@ -3921,84 +3946,28 @@ void mono_thread_suspend_all_other_threads (void)
 	 */
 	g_assert (shutting_down);
 
+	mono_threads_lock ();
+	mono_g_hash_table_foreach (threads, suspend_thread, NULL);
+	mono_threads_unlock ();
+
 	/*
-	 * We make multiple calls to WaitForMultipleObjects since:
-	 * - we can only wait for MONO_W32HANDLE_MAXIMUM_WAIT_OBJECTS threads
-	 * - some threads could exit without becoming suspended
+	 * Cooperative suspend requires the threads to be scheduled and enter
+	 * suspend themselves. If we won't wait there's a race against any runtime
+	 * cleanup that's done via mono_runtime_quit_internal() and may reference data
+	 * structures that were already tore down. If the thread is stuck in a prolonged
+	 * native call there's not much that can be done to interrupt it. Best we can do
+	 * is give up after certain amount of time and then continue with shutdown.
 	 */
-	finished = FALSE;
-	while (!finished) {
-		/*
-		 * Make a copy of the hashtable since we can't do anything with
-		 * threads while threads_mutex is held.
-		 */
-		wait->num = 0;
-		/*We must zero all InternalThread pointers to avoid making the GC unhappy.*/
-		memset (wait->threads, 0, sizeof (wait->threads));
-		mono_threads_lock ();
-		mono_g_hash_table_foreach (threads, collect_threads_for_suspend, wait);
-		mono_threads_unlock ();
+	start_time = mono_msec_ticks ();
+	while (is_still_suspending() && mono_msec_ticks() - start_time < 1000)
+		mono_thread_info_sleep (50, NULL);
 
-		eventidx = 0;
-		/* Get the suspended events that we'll be waiting for */
-		for (i = 0; i < wait->num; ++i) {
-			MonoInternalThread *thread = wait->threads [i];
-
-			if (mono_native_thread_id_equals (thread_get_tid (thread), self)
-			     || mono_gc_is_finalizer_internal_thread (thread)
-			     || (thread->flags & MONO_THREAD_FLAG_DONT_MANAGE)
-			) {
-				mono_threads_close_thread_handle (wait->handles [i]);
-				wait->threads [i] = NULL;
-				continue;
-			}
-
-			LOCK_THREAD (thread);
-
-			if (thread->state & (ThreadState_Suspended | ThreadState_Stopped)) {
-				UNLOCK_THREAD (thread);
-				mono_threads_close_thread_handle (wait->handles [i]);
-				wait->threads [i] = NULL;
-				continue;
-			}
-
-			++eventidx;
-
-			/* Convert abort requests into suspend requests */
-			if ((thread->state & ThreadState_AbortRequested) != 0)
-				thread->state &= ~ThreadState_AbortRequested;
-			
-			thread->state |= ThreadState_SuspendRequested;
-			MONO_ENTER_GC_SAFE;
-			mono_os_event_reset (thread->suspended);
-			MONO_EXIT_GC_SAFE;
-
-			/* Signal the thread to suspend + calls UNLOCK_THREAD (thread) */
-			async_suspend_internal (thread, TRUE);
-
-			mono_threads_close_thread_handle (wait->handles [i]);
-			wait->threads [i] = NULL;
-		}
-		if (eventidx <= 0) {
-			/* 
-			 * If there are threads which are starting up, we wait until they
-			 * are suspended when they try to register in the threads hash.
-			 * This is guaranteed to finish, since the threads which can create new
-			 * threads get suspended after a while.
-			 * FIXME: The finalizer thread can still create new threads.
-			 */
-			mono_threads_lock ();
-			if (threads_starting_up)
-				starting = mono_g_hash_table_size (threads_starting_up) > 0;
-			else
-				starting = FALSE;
-			mono_threads_unlock ();
-			if (starting)
-				mono_thread_info_sleep (100, NULL);
-			else
-				finished = TRUE;
-		}
+	if (is_still_suspending()) {
+		g_warning("Some threads failed to suspend before timeout reached. Continuing with shutdown.");
+		return FALSE;
 	}
+
+	return TRUE;
 }
 
 typedef struct {

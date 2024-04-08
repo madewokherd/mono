@@ -359,7 +359,7 @@ mono_thread_set_name (MonoInternalThread *thread,
 		MONO_THREAD_NAME_WINDOWS_CONSTANT (name),               \
 		(flags) | MonoSetThreadNameFlag_Constant, NULL)
 
-void mono_thread_suspend_all_other_threads (void);
+gboolean mono_thread_suspend_all_other_threads (void);
 gboolean mono_threads_abort_appdomain_threads (MonoDomain *domain, int timeout);
 
 void mono_thread_push_appdomain_ref (MonoDomain *domain);
