@@ -7308,7 +7308,18 @@ ves_icall_System_Environment_Exit (int result)
 		mono_runtime_quit_internal ();
 
 	/* we may need to do some cleanup here... */
+
+#ifdef HOST_WIN32
+	/*
+	 * Wine msvcrt's exit() calls CorExitProcess() if mscoree is loaded.
+	 * This in turn tries to gracefully call System.Environment.Exit for
+	 * each loaded runtime ending up in a circular dependency if we need to
+	 * hard-quit. Because of that we have to use ExitProcess() directly here.
+	 * */
+	ExitProcess (result);
+#else
 	exit (result);
+#endif
 }
 
 void
