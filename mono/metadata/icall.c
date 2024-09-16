@@ -1595,7 +1595,7 @@ ves_icall_System_RuntimeTypeHandle_internal_from_name (MonoStringHandle name,
 	{
 		const char *hidetypes = getenv("WINE_MONO_HIDETYPES");
 
-		if (hidetypes && strcmp(hidetypes, "0") != 0)
+		if (!hidetypes || strcmp(hidetypes, "0") != 0)
 			hide_type = TRUE;
 	}
 
