@@ -491,4 +491,5 @@ partial class SR
 	public const string ObjectDisposed_ViewAccessorClosed = "Cannot access a closed accessor.";
 	public const string ObjectDisposed_StreamIsClosed = "Cannot access a closed Stream.";
 	public const string PlatformNotSupported_NamedMaps = "Named maps are not supported.";
+	public const string NotSupported_IONonFileDevices = "The handle does not support synchronous operations on this type of device.";
 }
