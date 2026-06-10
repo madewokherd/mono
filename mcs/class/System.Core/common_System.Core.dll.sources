@@ -337,3 +337,7 @@ System.Security.Cryptography/SHA512CryptoServiceProvider.cs
 ../referencesource/System.Core/Microsoft/Win32/UnsafeNativeMethods.cs
 ../referencesource/System.Core/Microsoft/Win32/SafeHandles/SafeLibraryHandle.cs
 ../referencesource/System.Core/Microsoft/Win32/SafeHandles/SafePerfProviderHandle.cs
+
+../referencesource/System.Core/System/Diagnostics/Eventing/EventDescriptor.cs
+../referencesource/System.Core/System/Diagnostics/Eventing/EventProvider.cs
+../referencesource/System.Core/System/Diagnostics/Eventing/EventProviderTraceListener.cs
